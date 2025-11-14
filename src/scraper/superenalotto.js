@@ -35,6 +35,41 @@ function findSectionText($, marker) {
   return body.includes(marker) ? body.slice(body.indexOf(marker)) : "";
 }
 
+function findSectionElement($, marker) {
+  let node = null;
+  $("*").each((_, el) => {
+    const txt = normalizeText($(el).text() || "");
+    if (!node && txt.includes(marker)) node = el;
+  });
+  return node;
+}
+
+function parseLatestDrawFromDom($, root) {
+  const nums = [];
+  $(root).find("span,div,li,b,strong").each((_, el) => {
+    const t = ($(el).text() || "").trim();
+    if (/^\d{1,2}$/.test(t)) nums.push(parseInt(t, 10));
+  });
+  const main = [];
+  const used = new Set();
+  for (const n of nums) {
+    if (n >= 1 && n <= 90 && !used.has(n)) {
+      main.push(n);
+      used.add(n);
+      if (main.length === 6) break;
+    }
+  }
+  if (main.length < 6) return null;
+  let jolly = null, superstar = null;
+  for (const n of nums) {
+    if (used.has(n)) continue;
+    if (jolly == null) { jolly = n; continue; }
+    if (superstar == null) { superstar = n; break; }
+  }
+  const drawNoMatch = $(root).text().match(/Drawing\s*n\.?\s*([0-9]+)/i) || $(root).text().match(/\((\d{1,3}\/\d{2})\)/);
+  return { main, jolly, superstar, date: null, draw: drawNoMatch ? drawNoMatch[1] : null };
+}
+
 function parseJackpotFromText(text) {
   const re = /€\s*([0-9.,]+)\s*(Million|Billion)?/gi;
   let best = null, bestVal = 0;
@@ -126,14 +161,22 @@ export async function fetchCurrentJackpot() {
 export async function fetchLatestDraw() {
   try {
     const $ = await load("https://www.superenalotto.com/en/");
-    const section = findSectionText($, "SuperEnalotto Last Draw");
-    const parsed = parseLatestDrawFromText(section);
+    const el = findSectionElement($, "SuperEnalotto Last Draw");
+    let parsed = el ? parseLatestDrawFromDom($, el) : null;
+    if (!parsed) {
+      const section = findSectionText($, "SuperEnalotto Last Draw");
+      parsed = parseLatestDrawFromText(section);
+    }
     if (parsed) return { source: "superenalotto.com", ...parsed };
   } catch {}
   try {
     const $ = await load("https://www.superenalotto.net/en/");
-    const section = findSectionText($, "Latest Result");
-    const parsed = parseLatestDrawFromText(section);
+    const el = findSectionElement($, "Latest Result");
+    let parsed = el ? parseLatestDrawFromDom($, el) : null;
+    if (!parsed) {
+      const section = findSectionText($, "Latest Result");
+      parsed = parseLatestDrawFromText(section);
+    }
     if (parsed) return { source: "superenalotto.net", ...parsed };
   } catch {}
   return { source: null, main: null, jolly: null, superstar: null, date: null, draw: null };
