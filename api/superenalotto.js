@@ -7,7 +7,7 @@ export default async function handler(req, res) {
     const errors = {};
     try { jackpot = await fetchCurrentJackpot(); } catch (e) { errors.jackpot = e?.message || String(e); }
     try { latest = await fetchLatestDraw(); } catch (e) { errors.latest = e?.message || String(e); }
-    try { previous = await fetchPreviousDraws(limit); } catch (e) { errors.previous = e?.message || String(e); }
+    try { previous = await fetchPreviousDraws(limit, latest?.date || null); } catch (e) { errors.previous = e?.message || String(e); }
     res.setHeader("Cache-Control", "s-maxage=300, stale-while-revalidate=600");
     res.setHeader("Content-Type", "application/json");
     res.status(200).json({ jackpot, latest, previous, errors });
