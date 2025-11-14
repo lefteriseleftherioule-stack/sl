@@ -89,11 +89,13 @@ function parseArchiveFromDom($, limit = 20, excludeDate = null) {
     const seg = normalizeText(container.text() || "");
     const start = seg.indexOf(dateRaw);
     const afterDate = start >= 0 ? seg.slice(start + dateRaw.length) : seg;
-    const jPos = afterDate.search(/Jolly/i);
-    const beforeJolly = jPos >= 0 ? afterDate.slice(0, jPos) : afterDate;
+    const nextDateIdx = afterDate.search(/\b\d{1,2}\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}\b/i);
+    const block = nextDateIdx >= 0 ? afterDate.slice(0, nextDateIdx) : afterDate;
+    const jPos = block.search(/Jolly/i);
+    const beforeJolly = jPos >= 0 ? block.slice(0, jPos) : block;
     let nums = (beforeJolly.match(/\b\d{1,2}\b/g) || []).map(n => parseInt(n,10));
     const day = parseInt(dateCanon.split(' ')[0], 10);
-    if (nums.length >= 7 && nums[0] === day) nums = nums.slice(1);
+    if (nums.length && nums[0] === day) nums = nums.slice(1);
     const main = [];
     const used = new Set();
     for (const n of nums) {
@@ -103,8 +105,8 @@ function parseArchiveFromDom($, limit = 20, excludeDate = null) {
         if (main.length === 6) break;
       }
     }
-    const jm = afterDate.match(/\bJolly\D*(\d{1,2})\b/i);
-    const sm = afterDate.match(/\bSuper\s*Star\D*(\d{1,2})\b/i) || afterDate.match(/\bSuperstar\D*(\d{1,2})\b/i);
+    const jm = block.match(/\bJolly\D*(\d{1,2})\b/i);
+    const sm = block.match(/\bSuper\s*Star\D*(\d{1,2})\b/i) || block.match(/\bSuperstar\D*(\d{1,2})\b/i);
     const jolly = jm ? parseInt(jm[1], 10) : null;
     const superstar = sm ? parseInt(sm[1], 10) : null;
     if (main.length === 6 && jolly != null && superstar != null) {
