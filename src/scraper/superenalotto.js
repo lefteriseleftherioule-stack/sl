@@ -86,25 +86,25 @@ function parseArchiveFromDom($, limit = 20, excludeDate = null) {
     const dateCanon = toCanonicalDate(dateRaw) || dateRaw;
     if (excludeDate && excludeDate.toLowerCase() === dateCanon.toLowerCase()) return;
     const container = $(el).closest("section, div, li, tr").length ? $(el).closest("section, div, li, tr") : $(el);
-    const segText = normalizeText(container.text() || "");
-    const jMatch = segText.match(/\bJolly\s*(\d{1,2})\b/i) || segText.match(/(\d{1,2})\s*Jolly\b/i);
-    const sMatch = segText.match(/\b(?:Super\s*Star|Superstar)\s*(\d{1,2})\b/i) || segText.match(/(\d{1,2})\s*(?:Super\s*Star|Superstar)\b/i);
-    const jolly = jMatch ? parseInt(jMatch[1], 10) : null;
-    const superstar = sMatch ? parseInt(sMatch[1], 10) : null;
-    const nums = [];
-    container.find("span,div,li,b,strong").each((__, node) => {
-      const t = ($(node).text() || "").trim();
-      if (/^\d{1,2}$/.test(t)) nums.push(parseInt(t, 10));
-    });
+    const seg = normalizeText(container.text() || "");
+    const start = seg.indexOf(dateRaw);
+    const afterDate = start >= 0 ? seg.slice(start + dateRaw.length) : seg;
+    const jPos = afterDate.search(/Jolly/i);
+    const beforeJolly = jPos >= 0 ? afterDate.slice(0, jPos) : afterDate;
+    const nums = (beforeJolly.match(/\b\d{1,2}\b/g) || []).map(n => parseInt(n,10));
     const main = [];
     const used = new Set();
     for (const n of nums) {
-      if (n >= 1 && n <= 90 && n !== jolly && n !== superstar && !used.has(n)) {
+      if (n >= 1 && n <= 90 && !used.has(n)) {
         main.push(n);
         used.add(n);
         if (main.length === 6) break;
       }
     }
+    const jMatch = afterDate.match(/\bJolly\s*(\d{1,2})\b/i) || afterDate.match(/(\d{1,2})\s*Jolly\b/i);
+    const sMatch = afterDate.match(/\b(?:Super\s*Star|Superstar)\s*(\d{1,2})\b/i) || afterDate.match(/(\d{1,2})\s*(?:Super\s*Star|Superstar)\b/i);
+    const jolly = jMatch ? parseInt(jMatch[1] || jMatch[2], 10) : null;
+    const superstar = sMatch ? parseInt(sMatch[1] || sMatch[2], 10) : null;
     if (main.length === 6 && jolly != null && superstar != null) {
       results.push({ date: dateCanon, main, jolly, superstar });
     }
