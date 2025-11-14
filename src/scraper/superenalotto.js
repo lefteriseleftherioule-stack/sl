@@ -36,36 +36,72 @@ function findSectionText($, marker) {
 }
 
 function parseJackpotFromText(text) {
-  const euro = (text.match(/(?:jackpot[^€]*?|estimated[^€]*?)€\s*[0-9.,]+\s*(?:Million|Billion)?|€\s*[0-9.,]+\s*(?:Million|Billion)?/i) || [])[0];
-  if (!euro) return null;
-  const value = (euro.match(/€\s*[0-9.,]+\s*(?:Million|Billion)?/i) || [])[0];
-  return value ? value.replace(/\s+/g, " ").trim() : null;
+  const re = /€\s*([0-9.,]+)\s*(Million|Billion)?/gi;
+  let best = null, bestVal = 0;
+  for (const m of text.matchAll(re)) {
+    const num = parseFloat(m[1].replace(/,/g, ""));
+    if (isNaN(num)) continue;
+    let val = num;
+    const unit = (m[2] || "").toLowerCase();
+    if (unit === "million") val = num * 1e6;
+    else if (unit === "billion") val = num * 1e9;
+    if (val > bestVal) { bestVal = val; best = m[0]; }
+  }
+  return best ? best.replace(/\s+/g, " ").trim() : null;
 }
 
 function parseLatestDrawFromText(text) {
   const nums = extractAllNumbers(text);
-  if (nums.length < 8) return null;
-  const labelWindow = text.slice(0, 4000);
-  const hasJolly = /jolly/i.test(labelWindow);
-  const hasSuperstar = /super\s*star|superstar/i.test(labelWindow);
-  const main = nums.slice(0, 6);
-  const jolly = nums[6];
-  const superstar = nums[7];
-  const dateMatch = text.match(new RegExp(`(${monthNames.join("|")}|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)[^\n]*?\d{1,2}[^\n]*?(January|February|March|April|May|June|July|August|September|October|November|December)?[^\n]*?\d{4}`, "i"));
+  if (!nums.length) return null;
+  const main = [];
+  const used = new Set();
+  for (const n of nums) {
+    if (n >= 1 && n <= 90 && !used.has(n)) {
+      main.push(n);
+      used.add(n);
+      if (main.length === 6) break;
+    }
+  }
+  if (main.length < 6) return null;
+  let jolly = null, superstar = null;
+  for (const n of nums) {
+    if (main.includes(n)) continue;
+    if (jolly == null) { jolly = n; continue; }
+    if (superstar == null) { superstar = n; break; }
+  }
+  const dateMatch = text.match(new RegExp(`(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)[^\n]*?\b\d{1,2}(?:st|nd|rd|th)?\b[^\n]*?(January|February|March|April|May|June|July|August|September|October|November|December)[^\n]*?\b\d{4}\b`, "i"))
+    || text.match(new RegExp(`\b\d{1,2}(?:st|nd|rd|th)?\s+(?:${monthNames.join("|")})\s+\d{4}\b`, "i"));
   const drawNoMatch = text.match(/Drawing\s*n\.?\s*([0-9]+)/i) || text.match(/\((\d{1,3}\/\d{2})\)/);
-  return { main, jolly: hasJolly ? jolly : jolly, superstar: hasSuperstar ? superstar : superstar, date: dateMatch ? normalizeText(dateMatch[0]) : null, draw: drawNoMatch ? drawNoMatch[1] : null };
+  return { main, jolly, superstar, date: dateMatch ? normalizeText(dateMatch[0]) : null, draw: drawNoMatch ? drawNoMatch[1] : null };
 }
 
 function parseArchiveTextToDraws(text, limit = 20) {
   const results = [];
-  const dateRegex = new RegExp(`\n?((?:\d{1,2}\s+(?:${monthNames.join("|")})\s+\d{4}))`, "g");
+  const dateRegex = new RegExp(`((?:\\d{1,2}(?:st|nd|rd|th)?\\s+(?:${monthNames.join("|")})\\s+\\d{4}))`, "g");
   let m;
   while ((m = dateRegex.exec(text)) && results.length < limit) {
     const date = m[1];
-    const segment = text.slice(m.index, m.index + 500);
+    const segment = text.slice(m.index, m.index + 600);
     const nums = extractAllNumbers(segment);
-    if (nums.length >= 8) {
-      results.push({ date: normalizeText(date), main: nums.slice(0, 6), jolly: nums[6], superstar: nums[7] });
+    const main = [];
+    const used = new Set();
+    for (const n of nums) {
+      if (n >= 1 && n <= 90 && !used.has(n)) {
+        main.push(n);
+        used.add(n);
+        if (main.length === 6) break;
+      }
+    }
+    if (main.length === 6) {
+      let jolly = null, superstar = null;
+      for (const n of nums) {
+        if (main.includes(n)) continue;
+        if (jolly == null) { jolly = n; continue; }
+        if (superstar == null) { superstar = n; break; }
+      }
+      if (jolly != null && superstar != null) {
+        results.push({ date: normalizeText(date), main, jolly, superstar });
+      }
     }
   }
   return results;
