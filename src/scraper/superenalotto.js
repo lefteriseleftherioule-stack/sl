@@ -44,6 +44,12 @@ function findSectionElement($, marker) {
   return node;
 }
 
+function toCanonicalDate(str) {
+  if (!str) return null;
+  const m = str.match(new RegExp(`\\b(\\d{1,2})\\s+(?:${monthNames.join("|")})\\s+(\\d{4})\\b`, "i"));
+  return m ? `${parseInt(m[1],10)} ${m[0].split(/\s+/)[1]} ${m[2]}` : null;
+}
+
 function parseLatestDrawFromDom($, root) {
   const text = normalizeText($(root).text() || "");
   const jMatch = text.match(/(?:^|\s)(\d{1,2})\s*Jolly\b/i) || text.match(/\bJolly\s*(\d{1,2})\b/i);
@@ -76,8 +82,9 @@ function parseArchiveFromDom($, limit = 20, excludeDate = null) {
     const txt = normalizeText($(el).text() || "");
     const m = txt.match(dateRegex);
     if (!m) return;
-    const date = normalizeText(m[0]);
-    if (excludeDate && normalizeText(excludeDate) === date) return;
+    const dateRaw = normalizeText(m[0]);
+    const dateCanon = toCanonicalDate(dateRaw) || dateRaw;
+    if (excludeDate && excludeDate.toLowerCase() === dateCanon.toLowerCase()) return;
     const container = $(el).closest("section, div, li, tr").length ? $(el).closest("section, div, li, tr") : $(el);
     const segText = normalizeText(container.text() || "");
     const jMatch = segText.match(/\bJolly\s*(\d{1,2})\b/i) || segText.match(/(\d{1,2})\s*Jolly\b/i);
@@ -99,7 +106,7 @@ function parseArchiveFromDom($, limit = 20, excludeDate = null) {
       }
     }
     if (main.length === 6 && jolly != null && superstar != null) {
-      results.push({ date, main, jolly, superstar });
+      results.push({ date: dateCanon, main, jolly, superstar });
     }
   });
   const unique = [];
@@ -227,14 +234,29 @@ export async function fetchLatestDraw() {
 }
 
 export async function fetchPreviousDraws(limit = 10, excludeDate = null) {
+  const excludeCanon = toCanonicalDate(excludeDate || "");
   try {
     const $ = await load("https://www.superenalotto.com/en/archive");
-    const list = parseArchiveFromDom($, limit, excludeDate);
+    let list = parseArchiveFromDom($, limit, excludeCanon);
+    if (!list.length) {
+      const text = normalizeText($("body").text() || "");
+      list = parseArchiveTextToDraws(text, limit).filter(r => {
+        const d = toCanonicalDate(r.date || "") || r.date;
+        return !(excludeCanon && d && d.toLowerCase() === excludeCanon.toLowerCase());
+      });
+    }
     if (list.length) return { source: "superenalotto.com", draws: list.slice(0, limit) };
   } catch {}
   try {
     const $ = await load("https://www.superenalotto.net/en/results");
-    const list = parseArchiveFromDom($, limit, excludeDate);
+    let list = parseArchiveFromDom($, limit, excludeCanon);
+    if (!list.length) {
+      const text = normalizeText($("body").text() || "");
+      list = parseArchiveTextToDraws(text, limit).filter(r => {
+        const d = toCanonicalDate(r.date || "") || r.date;
+        return !(excludeCanon && d && d.toLowerCase() === excludeCanon.toLowerCase());
+      });
+    }
     if (list.length) return { source: "superenalotto.net", draws: list.slice(0, limit) };
   } catch {}
   return { source: null, draws: [] };
