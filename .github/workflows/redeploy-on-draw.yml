@@ -1,0 +1,25 @@
+name: Redeploy on SuperEnalotto Draw
+
+on:
+  schedule:
+    - cron: '5 19 * * 2,4,5,6' # 19:05 UTC ≈ 20:05 CET
+    - cron: '5 18 * * 2,4,5,6' # 18:05 UTC ≈ 20:05 CEST
+  workflow_dispatch:
+
+jobs:
+  trigger-vercel-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Vercel Deploy Hook
+        env:
+          HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$HOOK" ]; then
+            echo "VERCEL_DEPLOY_HOOK_URL secret not set"; exit 1;
+          fi
+          echo "Triggering deploy via $HOOK"
+          code=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$HOOK")
+          echo "HTTP $code"
+          if [ "$code" -ge 400 ]; then
+            echo "Deploy hook failed"; exit 1;
+          fi
