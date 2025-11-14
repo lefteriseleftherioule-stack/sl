@@ -1,4 +1,4 @@
-import cheerio from "cheerio";
+import { load as cheerioLoad } from "cheerio";
 
 const monthNames = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 
@@ -13,7 +13,7 @@ async function load(url) {
   const res = await f(url, { headers: { "user-agent": "Mozilla/5.0" } });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const html = await res.text();
-  return cheerio.load(html);
+  return cheerioLoad(html);
 }
 
 function normalizeText(t) {
