@@ -45,6 +45,11 @@ function findSectionElement($, marker) {
 }
 
 function parseLatestDrawFromDom($, root) {
+  const text = normalizeText($(root).text() || "");
+  const jMatch = text.match(/(?:^|\s)(\d{1,2})\s*Jolly\b/i) || text.match(/\bJolly\s*(\d{1,2})\b/i);
+  const sMatch = text.match(/(?:^|\s)(\d{1,2})\s*(?:Super\s*Star|Superstar)\b/i) || text.match(/\b(?:Super\s*Star|Superstar)\s*(\d{1,2})\b/i);
+  const jolly = jMatch ? parseInt(jMatch[1], 10) : null;
+  const superstar = sMatch ? parseInt(sMatch[1], 10) : null;
   const nums = [];
   $(root).find("span,div,li,b,strong").each((_, el) => {
     const t = ($(el).text() || "").trim();
@@ -53,21 +58,15 @@ function parseLatestDrawFromDom($, root) {
   const main = [];
   const used = new Set();
   for (const n of nums) {
-    if (n >= 1 && n <= 90 && !used.has(n)) {
+    if (n >= 1 && n <= 90 && n !== jolly && n !== superstar && !used.has(n)) {
       main.push(n);
       used.add(n);
       if (main.length === 6) break;
     }
   }
-  if (main.length < 6) return null;
-  let jolly = null, superstar = null;
-  for (const n of nums) {
-    if (used.has(n)) continue;
-    if (jolly == null) { jolly = n; continue; }
-    if (superstar == null) { superstar = n; break; }
-  }
-  const drawNoMatch = $(root).text().match(/Drawing\s*n\.?\s*([0-9]+)/i) || $(root).text().match(/\((\d{1,3}\/\d{2})\)/);
-  return { main, jolly, superstar, date: null, draw: drawNoMatch ? drawNoMatch[1] : null };
+  const dateMatch = text.match(new RegExp(`(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\\s+\\d{1,2}\\s+(?:${monthNames.join("|")})\\s+\\d{4}`, "i"));
+  const drawNoMatch = text.match(/Drawing\s*n\.?\s*([0-9]+)/i) || text.match(/\((\d{1,3}\/\d{2})\)/);
+  return { main, jolly, superstar, date: dateMatch ? normalizeText(dateMatch[0]) : null, draw: drawNoMatch ? drawNoMatch[1] : null };
 }
 
 function parseJackpotFromText(text) {
