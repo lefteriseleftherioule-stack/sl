@@ -69,6 +69,51 @@ function parseLatestDrawFromDom($, root) {
   return { main, jolly, superstar, date: dateMatch ? normalizeText(dateMatch[0]) : null, draw: drawNoMatch ? drawNoMatch[1] : null };
 }
 
+function parseArchiveFromDom($, limit = 20, excludeDate = null) {
+  const dateRegex = new RegExp(`\\b\\d{1,2}\\s+(?:${monthNames.join("|")})\\s+\\d{4}\\b`, "i");
+  const results = [];
+  $("*").each((_, el) => {
+    const txt = normalizeText($(el).text() || "");
+    const m = txt.match(dateRegex);
+    if (!m) return;
+    const date = normalizeText(m[0]);
+    if (excludeDate && normalizeText(excludeDate) === date) return;
+    const container = $(el).closest("section, div, li, tr").length ? $(el).closest("section, div, li, tr") : $(el);
+    const segText = normalizeText(container.text() || "");
+    const jMatch = segText.match(/\bJolly\s*(\d{1,2})\b/i) || segText.match(/(\d{1,2})\s*Jolly\b/i);
+    const sMatch = segText.match(/\b(?:Super\s*Star|Superstar)\s*(\d{1,2})\b/i) || segText.match(/(\d{1,2})\s*(?:Super\s*Star|Superstar)\b/i);
+    const jolly = jMatch ? parseInt(jMatch[1], 10) : null;
+    const superstar = sMatch ? parseInt(sMatch[1], 10) : null;
+    const nums = [];
+    container.find("span,div,li,b,strong").each((__, node) => {
+      const t = ($(node).text() || "").trim();
+      if (/^\d{1,2}$/.test(t)) nums.push(parseInt(t, 10));
+    });
+    const main = [];
+    const used = new Set();
+    for (const n of nums) {
+      if (n >= 1 && n <= 90 && n !== jolly && n !== superstar && !used.has(n)) {
+        main.push(n);
+        used.add(n);
+        if (main.length === 6) break;
+      }
+    }
+    if (main.length === 6 && jolly != null && superstar != null) {
+      results.push({ date, main, jolly, superstar });
+    }
+  });
+  const unique = [];
+  const seen = new Set();
+  for (const r of results) {
+    const key = `${r.date}:${r.main.join(',')}:${r.jolly}:${r.superstar}`;
+    if (seen.has(key)) continue;
+    unique.push(r);
+    seen.add(key);
+    if (unique.length >= limit) break;
+  }
+  return unique;
+}
+
 function parseJackpotFromText(text) {
   const re = /€\s*([0-9.,]+)\s*(Million|Billion)?/gi;
   let best = null, bestVal = 0;
@@ -181,17 +226,15 @@ export async function fetchLatestDraw() {
   return { source: null, main: null, jolly: null, superstar: null, date: null, draw: null };
 }
 
-export async function fetchPreviousDraws(limit = 10) {
+export async function fetchPreviousDraws(limit = 10, excludeDate = null) {
   try {
     const $ = await load("https://www.superenalotto.com/en/archive");
-    const text = normalizeText($("body").text() || "");
-    const list = parseArchiveTextToDraws(text, limit);
+    const list = parseArchiveFromDom($, limit, excludeDate);
     if (list.length) return { source: "superenalotto.com", draws: list.slice(0, limit) };
   } catch {}
   try {
     const $ = await load("https://www.superenalotto.net/en/results");
-    const text = normalizeText($("body").text() || "");
-    const list = parseArchiveTextToDraws(text, limit);
+    const list = parseArchiveFromDom($, limit, excludeDate);
     if (list.length) return { source: "superenalotto.net", draws: list.slice(0, limit) };
   } catch {}
   return { source: null, draws: [] };
