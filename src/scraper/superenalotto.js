@@ -135,15 +135,13 @@ function parseArchiveFromDom($, limit = 20, excludeDate = null) {
       if (!used.has(n)) { main.unshift(n); used.add(n); }
     }
     let jolly = null, superstar = null;
-    const postJText = jIdx >= 0 ? block.slice(jIdx) : '';
-    const postSText = (sIdxA >= 0 ? block.slice(sIdxA) : (sIdxB >= 0 ? block.slice(sIdxB) : ''));
-    const pickNext = (t) => {
-      const arr = (t.match(/\b\d{1,2}\b/g) || []).map(v => parseInt(v,10)).filter(v => v >= 1 && v <= 90);
-      for (const v of arr) { if (v === day) continue; if (!used.has(v)) return v; }
-      return null;
-    };
-    jolly = pickNext(postJText);
-    superstar = pickNext(postSText);
+    const postText = block.slice(preMainText.length);
+    const tailNums = (postText.match(/\b\d{1,2}\b/g) || []).map(v => parseInt(v,10)).filter(v => v >= 1 && v <= 90);
+    for (const v of tailNums) {
+      if (v === day || used.has(v)) continue;
+      if (jolly == null) { jolly = v; continue; }
+      if (superstar == null) { superstar = v; break; }
+    }
     if (main.length === 6 && jolly != null && superstar != null) {
       results.push({ date: dateCanon, main, jolly, superstar });
     }
