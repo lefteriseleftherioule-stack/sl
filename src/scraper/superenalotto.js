@@ -95,12 +95,18 @@ function parseArchiveFromDom($, limit = 20, excludeDate = null) {
     const sm = block.match(/\bSuper\s*Star\D*(\d{1,2})\b/i) || block.match(/\bSuperstar\D*(\d{1,2})\b/i);
     const jolly = jm ? parseInt(jm[1], 10) : null;
     const superstar = sm ? parseInt(sm[1], 10) : null;
-    let numsAll = (block.match(/\b\d{1,2}\b/g) || []).map(n => parseInt(n,10)).filter(n => n >= 1 && n <= 90);
-    const day = parseInt(dateCanon.split(' ')[0], 10);
-    if (jolly != null) { const i = numsAll.indexOf(jolly); if (i >= 0) numsAll.splice(i,1); }
-    if (superstar != null) { const i = numsAll.indexOf(superstar); if (i >= 0) numsAll.splice(i,1); }
-    if (numsAll.length >= 7 && numsAll[0] === day) numsAll = numsAll.slice(1);
-    const main = numsAll.slice(0,6);
+    const jIdx = block.search(/\bJolly\b/i);
+    const sIdxA = block.search(/\bSuper\s*Star\b/i);
+    const sIdxB = block.search(/\bSuperstar\b/i);
+    const sIdx = sIdxA >= 0 ? sIdxA : sIdxB;
+    const preMainText = jIdx >= 0 ? block.slice(0, jIdx) : (sIdx >= 0 ? block.slice(0, sIdx) : block);
+    const nums = (preMainText.match(/\b\d{1,2}\b/g) || []).map(n => parseInt(n,10)).filter(n => n >= 1 && n <= 90);
+    const main = [];
+    const used = new Set();
+    for (let i = nums.length - 1; i >= 0 && main.length < 6; i--) {
+      const n = nums[i];
+      if (!used.has(n)) { main.unshift(n); used.add(n); }
+    }
     if (main.length === 6 && jolly != null && superstar != null) {
       results.push({ date: dateCanon, main, jolly, superstar });
     }
