@@ -46,8 +46,24 @@ function findSectionElement($, marker) {
 
 function toCanonicalDate(str) {
   if (!str) return null;
-  const m = str.match(new RegExp(`\\b(\\d{1,2})\\s+(?:${monthNames.join("|")})\\s+(\\d{4})\\b`, "i"));
-  return m ? `${parseInt(m[1],10)} ${m[0].split(/\s+/)[1]} ${m[2]}` : null;
+  const m = str.match(new RegExp(`\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+(?:${monthNames.join("|")})\\s+(\\d{4})\\b`, "i"));
+  if (m) return `${parseInt(m[1],10)} ${m[0].split(/\s+/)[1]} ${m[2]}`;
+  const m2 = str.match(new RegExp(`\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+(?:${monthNames.join("|")})\\b`, "i"));
+  return m2 ? `${parseInt(m2[1],10)} ${m2[0].split(/\s+/)[1]}` : null;
+}
+
+function equalsDate(a, b) {
+  const norm = s => (s || "").replace(/\s+/g, " ").trim();
+  const sa = norm(a), sb = norm(b);
+  const rx = new RegExp(`\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+(?:${monthNames.join("|")})\\b`, "i");
+  const ry = /\\b(\\d{4})\\b/;
+  const ma = sa.match(rx), mb = sb.match(rx);
+  if (!ma || !mb) return sa.toLowerCase() === sb.toLowerCase();
+  const dayA = parseInt(ma[1],10), monthA = ma[0].split(/\s+/)[1].toLowerCase();
+  const dayB = parseInt(mb[1],10), monthB = mb[0].split(/\s+/)[1].toLowerCase();
+  const ya = (sa.match(ry) || [null])[1], yb = (sb.match(ry) || [null])[1];
+  if (ya && yb) return dayA === dayB && monthA === monthB && ya === yb;
+  return dayA === dayB && monthA === monthB;
 }
 
 function parseLatestDrawFromDom($, root) {
@@ -96,8 +112,8 @@ function parseArchiveFromDom($, limit = 20, excludeDate = null) {
       }
     }
     const dateCanon = toCanonicalDate(dateRaw) || dateRaw;
-    if (excludeDate && excludeDate.toLowerCase() === dateCanon.toLowerCase()) return;
-    const container = $(el).closest("section, div, li, tr").length ? $(el).closest("section, div, li, tr") : $(el);
+    if (excludeDate && equalsDate(excludeDate, dateCanon)) return;
+    const container = $(el).closest("tr, li, article").length ? $(el).closest("tr, li, article") : $(el);
     const seg = normalizeText(container.text() || "");
     const start = seg.indexOf(dateRaw);
     const afterDate = start >= 0 ? seg.slice(start + dateRaw.length) : seg;
@@ -260,7 +276,7 @@ export async function fetchPreviousDraws(limit = 10, excludeDate = null) {
       const text = normalizeText($("body").text() || "");
       list = parseArchiveTextToDraws(text, limit).filter(r => {
         const d = toCanonicalDate(r.date || "") || r.date;
-        return !(excludeCanon && d && d.toLowerCase() === excludeCanon.toLowerCase());
+        return !(excludeCanon && d && equalsDate(excludeCanon, d));
       });
     }
     if (list.length) return { source: "superenalotto.net", draws: list.slice(0, limit) };
@@ -272,7 +288,7 @@ export async function fetchPreviousDraws(limit = 10, excludeDate = null) {
       const text = normalizeText($("body").text() || "");
       list = parseArchiveTextToDraws(text, limit).filter(r => {
         const d = toCanonicalDate(r.date || "") || r.date;
-        return !(excludeCanon && d && d.toLowerCase() === excludeCanon.toLowerCase());
+        return !(excludeCanon && d && equalsDate(excludeCanon, d));
       });
     }
     if (list.length) return { source: "superenalotto.com", draws: list.slice(0, limit) };
