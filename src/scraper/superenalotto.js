@@ -119,24 +119,29 @@ function parseArchiveFromDom($, limit = 20, excludeDate = null) {
     const afterDate = start >= 0 ? seg.slice(start + dateRaw.length) : seg;
     const nextDateIdx = afterDate.search(/\\b\\d{1,2}(?:st|nd|rd|th)?\\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)(?:\\s+\\d{4})?\\b/i);
     const block = nextDateIdx >= 0 ? afterDate.slice(0, nextDateIdx) : afterDate;
-    const numsAll = (block.match(/\b\d{1,2}\b/g) || []).map(n => parseInt(n,10)).filter(n => n >= 1 && n <= 90);
-    const day = parseInt(dateCanon.split(' ')[0], 10);
+    const jIdx = block.search(/\bJolly\b/i);
+    const sIdxA = block.search(/\bSuper\s*Star\b/i);
+    const sIdxB = block.search(/\bSuperstar\b/i);
+    const cutIdxs = [jIdx, sIdxA, sIdxB].filter(i => i >= 0);
+    const cutIdx = cutIdxs.length ? Math.min(...cutIdxs) : -1;
+    const preMainText = cutIdx >= 0 ? block.slice(0, cutIdx) : block;
+    const nums = (preMainText.match(/\b\d{1,2}\b/g) || []).map(n => parseInt(n,10)).filter(n => n >= 1 && n <= 90);
     const main = [];
     const used = new Set();
-    for (const n of numsAll) {
-      if (n === day) continue;
-      if (!used.has(n)) {
-        main.push(n);
-        used.add(n);
-        if (main.length === 6) break;
-      }
+    for (let i = nums.length - 1; i >= 0 && main.length < 6; i--) {
+      const n = nums[i];
+      if (!used.has(n)) { main.unshift(n); used.add(n); }
     }
     let jolly = null, superstar = null;
-    for (const n of numsAll) {
-      if (used.has(n) || n === day) continue;
-      if (jolly == null) { jolly = n; continue; }
-      if (superstar == null) { superstar = n; break; }
-    }
+    const postJText = jIdx >= 0 ? block.slice(jIdx) : '';
+    const postSText = (sIdxA >= 0 ? block.slice(sIdxA) : (sIdxB >= 0 ? block.slice(sIdxB) : ''));
+    const pickNext = (t) => {
+      const arr = (t.match(/\b\d{1,2}\b/g) || []).map(v => parseInt(v,10)).filter(v => v >= 1 && v <= 90);
+      for (const v of arr) { if (!used.has(v)) return v; }
+      return null;
+    };
+    jolly = pickNext(postJText);
+    superstar = pickNext(postSText);
     if (main.length === 6 && jolly != null && superstar != null) {
       results.push({ date: dateCanon, main, jolly, superstar });
     }
@@ -201,11 +206,9 @@ function parseArchiveTextToDraws(text, limit = 20) {
     const date = m[1];
     const segment = text.slice(m.index, m.index + 600);
     const nums = extractAllNumbers(segment);
-    const day = parseInt(((toCanonicalDate(date) || date) || '').split(' ')[0], 10);
     const main = [];
     const used = new Set();
     for (const n of nums) {
-      if (n === day) continue;
       if (n >= 1 && n <= 90 && !used.has(n)) {
         main.push(n);
         used.add(n);
