@@ -76,20 +76,32 @@ function parseLatestDrawFromDom($, root) {
 }
 
 function parseArchiveFromDom($, limit = 20, excludeDate = null) {
-  const dateRegex = new RegExp(`\\b\\d{1,2}(?:st|nd|rd|th)?\\s+(?:${monthNames.join("|")})\\s+\\d{4}\\b`, "i");
+  const dateRegex = new RegExp(`\\b\\d{1,2}(?:st|nd|rd|th)?\\s+(?:${monthNames.join("|")})(?:\\s+\\d{4})?\\b`, "i");
   const results = [];
   $("*").each((_, el) => {
     const txt = normalizeText($(el).text() || "");
     const m = txt.match(dateRegex);
     if (!m) return;
-    const dateRaw = normalizeText(m[0]);
+    let dateRaw = normalizeText(m[0]);
+    const monthMatch = dateRaw.match(new RegExp(`\\b(?:${monthNames.join("|")})\\b`, "i"));
+    if (!/\\d{4}\\b/.test(dateRaw) && monthMatch) {
+      const mm = monthMatch[0];
+      const containerText = normalizeText((($(el).closest("section, div, li, tr").length ? $(el).closest("section, div, li, tr") : $(el)).text()) || "");
+      const bodyText = normalizeText($("body").text() || "");
+      const headerYearMatch = containerText.match(new RegExp(`\\b${mm}\\s+\\d{4}\\b`, "i")) || bodyText.match(new RegExp(`\\b${mm}\\s+\\d{4}\\b`, "i"));
+      if (headerYearMatch) {
+        const yr = (headerYearMatch[0].match(/\\d{4}/) || [""])[0];
+        const day = (dateRaw.match(/\\b\\d{1,2}\\b/) || [null])[0];
+        if (day) dateRaw = `${day} ${mm} ${yr}`;
+      }
+    }
     const dateCanon = toCanonicalDate(dateRaw) || dateRaw;
     if (excludeDate && excludeDate.toLowerCase() === dateCanon.toLowerCase()) return;
     const container = $(el).closest("section, div, li, tr").length ? $(el).closest("section, div, li, tr") : $(el);
     const seg = normalizeText(container.text() || "");
     const start = seg.indexOf(dateRaw);
     const afterDate = start >= 0 ? seg.slice(start + dateRaw.length) : seg;
-    const nextDateIdx = afterDate.search(/\\b\\d{1,2}(?:st|nd|rd|th)?\\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)\\s+\\d{4}\\b/i);
+    const nextDateIdx = afterDate.search(/\\b\\d{1,2}(?:st|nd|rd|th)?\\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)(?:\\s+\\d{4})?\\b/i);
     const block = nextDateIdx >= 0 ? afterDate.slice(0, nextDateIdx) : afterDate;
     const numsAll = (block.match(/\b\d{1,2}\b/g) || []).map(n => parseInt(n,10)).filter(n => n >= 1 && n <= 90);
     const day = parseInt(dateCanon.split(' ')[0], 10);
