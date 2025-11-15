@@ -76,7 +76,7 @@ function parseLatestDrawFromDom($, root) {
 }
 
 function parseArchiveFromDom($, limit = 20, excludeDate = null) {
-  const dateRegex = new RegExp(`\\b\\d{1,2}\\s+(?:${monthNames.join("|")})\\s+\\d{4}\\b`, "i");
+  const dateRegex = new RegExp(`\\b\\d{1,2}(?:st|nd|rd|th)?\\s+(?:${monthNames.join("|")})\\s+\\d{4}\\b`, "i");
   const results = [];
   $("*").each((_, el) => {
     const txt = normalizeText($(el).text() || "");
@@ -89,7 +89,7 @@ function parseArchiveFromDom($, limit = 20, excludeDate = null) {
     const seg = normalizeText(container.text() || "");
     const start = seg.indexOf(dateRaw);
     const afterDate = start >= 0 ? seg.slice(start + dateRaw.length) : seg;
-    const nextDateIdx = afterDate.search(/\b\d{1,2}\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}\b/i);
+    const nextDateIdx = afterDate.search(/\\b\\d{1,2}(?:st|nd|rd|th)?\\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)\\s+\\d{4}\\b/i);
     const block = nextDateIdx >= 0 ? afterDate.slice(0, nextDateIdx) : afterDate;
     const numsAll = (block.match(/\b\d{1,2}\b/g) || []).map(n => parseInt(n,10)).filter(n => n >= 1 && n <= 90);
     const day = parseInt(dateCanon.split(' ')[0], 10);
