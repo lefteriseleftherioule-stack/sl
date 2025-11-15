@@ -113,15 +113,18 @@ function parseArchiveFromDom($, limit = 20, excludeDate = null) {
     }
     const dateCanon = toCanonicalDate(dateRaw) || dateRaw;
     if (excludeDate && equalsDate(excludeDate, dateCanon)) return;
-    const container = $(el).closest("tr, li, article").length ? $(el).closest("tr, li, article") : $(el);
+    const container = $(el).closest("tr, li, article, div").length ? $(el).closest("tr, li, article, div") : $(el);
     const seg = normalizeText(container.text() || "");
     const start = seg.indexOf(dateRaw);
     const afterDate = start >= 0 ? seg.slice(start + dateRaw.length) : seg;
     const nextDateIdx = afterDate.search(/\\b\\d{1,2}(?:st|nd|rd|th)?\\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)(?:\\s+\\d{4})?\\b/i);
     const block = nextDateIdx >= 0 ? afterDate.slice(0, nextDateIdx) : afterDate;
-    const jIdx = block.search(/\bJolly\b/i);
-    const sIdxA = block.search(/\bSuper\s*Star\b/i);
-    const sIdxB = block.search(/\bSuperstar\b/i);
+    const jMatches = [...block.matchAll(/\bJolly\b/ig)];
+    const sMatchesA = [...block.matchAll(/\bSuper\s*Star\b/ig)];
+    const sMatchesB = [...block.matchAll(/\bSuperstar\b/ig)];
+    const jIdx = jMatches.length ? jMatches[jMatches.length - 1].index : -1;
+    const sIdxA = sMatchesA.length ? sMatchesA[sMatchesA.length - 1].index : -1;
+    const sIdxB = sMatchesB.length ? sMatchesB[sMatchesB.length - 1].index : -1;
     const cutIdxs = [jIdx, sIdxA, sIdxB].filter(i => i >= 0);
     const cutIdx = cutIdxs.length ? Math.min(...cutIdxs) : -1;
     const preMainText = cutIdx >= 0 ? block.slice(0, cutIdx) : block;
@@ -136,7 +139,7 @@ function parseArchiveFromDom($, limit = 20, excludeDate = null) {
     }
     let jolly = null, superstar = null;
     const postJText = jIdx >= 0 ? block.slice(jIdx) : '';
-    const postSText = (sIdxA >= 0 ? block.slice(sIdxA) : (sIdxB >= 0 ? block.slice(sIdxB) : ''));
+    const postSText = (() => { if (sIdxA >= 0 && sIdxB >= 0) return block.slice(Math.max(sIdxA, sIdxB)); if (sIdxA >= 0) return block.slice(sIdxA); if (sIdxB >= 0) return block.slice(sIdxB); return ''; })();
     const pickNext = (t) => {
       const arr = (t.match(/\b\d{1,2}\b/g) || []).map(v => parseInt(v,10)).filter(v => v >= 1 && v <= 90);
       for (const v of arr) { if (v === day) continue; if (!used.has(v)) return v; }
