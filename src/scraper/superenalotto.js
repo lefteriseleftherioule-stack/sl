@@ -91,10 +91,7 @@ function parseArchiveFromDom($, limit = 20, excludeDate = null) {
     const afterDate = start >= 0 ? seg.slice(start + dateRaw.length) : seg;
     const nextDateIdx = afterDate.search(/\b\d{1,2}\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}\b/i);
     const block = nextDateIdx >= 0 ? afterDate.slice(0, nextDateIdx) : afterDate;
-    const jm = block.match(/\bJolly\D*(\d{1,2})\b/i);
-    const sm = block.match(/\bSuper\s*Star\D*(\d{1,2})\b/i) || block.match(/\bSuperstar\D*(\d{1,2})\b/i);
-    const jolly = jm ? parseInt(jm[1], 10) : null;
-    const superstar = sm ? parseInt(sm[1], 10) : null;
+    let jolly = null, superstar = null;
     const jIdx = block.search(/\bJolly\b/i);
     const sIdxA = block.search(/\bSuper\s*Star\b/i);
     const sIdxB = block.search(/\bSuperstar\b/i);
@@ -109,6 +106,15 @@ function parseArchiveFromDom($, limit = 20, excludeDate = null) {
       if (n === day) continue;
       if (!used.has(n)) { main.unshift(n); used.add(n); }
     }
+    const postJText = jIdx >= 0 ? block.slice(jIdx) : '';
+    const postSText = sIdx >= 0 ? block.slice(sIdx) : '';
+    const pickNext = (t) => {
+      const arr = (t.match(/\b\d{1,2}\b/g) || []).map(v => parseInt(v,10)).filter(v => v >= 1 && v <= 90);
+      for (const v of arr) { if (v !== day && !main.includes(v)) return v; }
+      return null;
+    };
+    jolly = pickNext(postJText);
+    superstar = pickNext(postSText);
     if (main.length === 6 && jolly != null && superstar != null) {
       results.push({ date: dateCanon, main, jolly, superstar });
     }
