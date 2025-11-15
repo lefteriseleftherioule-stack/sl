@@ -101,10 +101,12 @@ function parseArchiveFromDom($, limit = 20, excludeDate = null) {
     const sIdx = sIdxA >= 0 ? sIdxA : sIdxB;
     const preMainText = jIdx >= 0 ? block.slice(0, jIdx) : (sIdx >= 0 ? block.slice(0, sIdx) : block);
     const nums = (preMainText.match(/\b\d{1,2}\b/g) || []).map(n => parseInt(n,10)).filter(n => n >= 1 && n <= 90);
+    const day = parseInt(dateCanon.split(' ')[0], 10);
     const main = [];
     const used = new Set();
     for (let i = nums.length - 1; i >= 0 && main.length < 6; i--) {
       const n = nums[i];
+      if (n === day) continue;
       if (!used.has(n)) { main.unshift(n); used.add(n); }
     }
     if (main.length === 6 && jolly != null && superstar != null) {
@@ -171,9 +173,11 @@ function parseArchiveTextToDraws(text, limit = 20) {
     const date = m[1];
     const segment = text.slice(m.index, m.index + 600);
     const nums = extractAllNumbers(segment);
+    const day = parseInt(((toCanonicalDate(date) || date) || '').split(' ')[0], 10);
     const main = [];
     const used = new Set();
     for (const n of nums) {
+      if (n === day) continue;
       if (n >= 1 && n <= 90 && !used.has(n)) {
         main.push(n);
         used.add(n);
