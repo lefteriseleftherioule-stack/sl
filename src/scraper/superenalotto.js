@@ -91,33 +91,24 @@ function parseArchiveFromDom($, limit = 20, excludeDate = null) {
     const afterDate = start >= 0 ? seg.slice(start + dateRaw.length) : seg;
     const nextDateIdx = afterDate.search(/\b\d{1,2}\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}\b/i);
     const block = nextDateIdx >= 0 ? afterDate.slice(0, nextDateIdx) : afterDate;
-    let jolly = null, superstar = null;
-    const jMatches = [...block.matchAll(/\bJolly\b/ig)];
-    const sMatchesA = [...block.matchAll(/\bSuper\s*Star\b/ig)];
-    const sMatchesB = [...block.matchAll(/\bSuperstar\b/ig)];
-    const jIdx = jMatches.length ? jMatches[jMatches.length - 1].index : -1;
-    const sIdxA = sMatchesA.length ? sMatchesA[sMatchesA.length - 1].index : -1;
-    const sIdxB = sMatchesB.length ? sMatchesB[sMatchesB.length - 1].index : -1;
-    const sIdx = Math.max(sIdxA, sIdxB);
-    const preMainText = jIdx >= 0 ? block.slice(0, jIdx) : (sIdx >= 0 ? block.slice(0, sIdx) : block);
-    const nums = (preMainText.match(/\b\d{1,2}\b/g) || []).map(n => parseInt(n,10)).filter(n => n >= 1 && n <= 90);
+    const numsAll = (block.match(/\b\d{1,2}\b/g) || []).map(n => parseInt(n,10)).filter(n => n >= 1 && n <= 90);
     const day = parseInt(dateCanon.split(' ')[0], 10);
     const main = [];
     const used = new Set();
-    for (let i = nums.length - 1; i >= 0 && main.length < 6; i--) {
-      const n = nums[i];
+    for (const n of numsAll) {
       if (n === day) continue;
-      if (!used.has(n)) { main.unshift(n); used.add(n); }
+      if (!used.has(n)) {
+        main.push(n);
+        used.add(n);
+        if (main.length === 6) break;
+      }
     }
-    const postJText = jIdx >= 0 ? block.slice(jIdx) : '';
-    const postSText = sIdx >= 0 ? block.slice(sIdx) : '';
-    const pickNext = (t) => {
-      const arr = (t.match(/\b\d{1,2}\b/g) || []).map(v => parseInt(v,10)).filter(v => v >= 1 && v <= 90);
-      for (const v of arr) { if (v !== day && !main.includes(v)) return v; }
-      return null;
-    };
-    jolly = pickNext(postJText);
-    superstar = pickNext(postSText);
+    let jolly = null, superstar = null;
+    for (const n of numsAll) {
+      if (used.has(n) || n === day) continue;
+      if (jolly == null) { jolly = n; continue; }
+      if (superstar == null) { superstar = n; break; }
+    }
     if (main.length === 6 && jolly != null && superstar != null) {
       results.push({ date: dateCanon, main, jolly, superstar });
     }
