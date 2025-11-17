@@ -1,6 +1,13 @@
 import { load as cheerioLoad } from "cheerio";
 
 const monthNames = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const DEBUG_SUPERSTAR = !!process.env.DEBUG_SUPERSTAR;
+function debugLog(type, payload) {
+  if (!DEBUG_SUPERSTAR) return;
+  const entry = { type, ...payload };
+  if (!globalThis.__SUPERSTAR_DEBUG__) globalThis.__SUPERSTAR_DEBUG__ = [];
+  globalThis.__SUPERSTAR_DEBUG__.push(entry);
+}
 
 async function getFetch() {
   if (globalThis.fetch) return globalThis.fetch;
@@ -175,6 +182,8 @@ function parseLatestDrawFromDom($, root) {
   const dayNum = (() => { const m = dm ? dm[0].match(/\b(\d{1,2})(?:st|nd|rd|th)?\b/) : null; return m ? parseInt(m[1],10) : null; })();
   let jolly = pickNear(jEl);
   let superstar = pickNearLocalStar(sEl, dayNum);
+  const starSource = "near-local-star";
+  debugLog("superstar-dom", { source: starSource, picked: superstar, labelText: normalizeText($(sEl).text() || ""), dayNum });
   if (jolly == null) {
     const tokens2 = [];
     $(root).find("*").each((_, el) => {
@@ -275,6 +284,7 @@ function parseArchiveFromDom($, limit = 20, excludeDate = null) {
           }
         });
       }
+      debugLog("superstar-archive-dom", { picked: superstar, containerText: seg.slice(0,200) });
       if (main.length === 6 && jolly != null && superstar != null) {
         results.push({ date: dateCanon, draw: drawNo, main, jolly, superstar });
       }
@@ -339,6 +349,7 @@ function parseLatestDrawFromText(text) {
   const jolly = pickAfter(jIdx);
   const pickAfterSkipDate = (idx) => { if (idx < 0) return null; for (let i = idx + 1; i < tokens.length; i++) { const t = tokens[i]; if (t.type === "num" && !t.isDateNumber) return t.value; } return null; };
   let superstar = pickAfterSkipDate(sIdx);
+  debugLog("superstar-text", { sIdx, picked: superstar });
   if (main.length < 6) {
     const used = new Set([jolly, superstar].filter(v => v != null));
     main = [];
