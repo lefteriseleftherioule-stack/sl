@@ -331,7 +331,10 @@ function parseLatestDrawFromText(text) {
   }
   const pickAfter = (idx) => { if (idx < 0) return null; for (let i = idx + 1; i < tokens.length; i++) { if (tokens[i].type === "num") return tokens[i].value; } return null; };
   const jolly = pickAfter(jIdx);
-  const superstar = (() => { if (sIdx < 0) return null; for (let i = sIdx + 1; i < tokens.length; i++) { const t = tokens[i]; if (t.type === "num" && t.idx < dateIdx) return t.value; } return null; })();
+  const superstar = (() => {
+    const next = tokens[sIdx + 1];
+    return next && next.type === "num" ? next.value : null;
+  })();
   if (main.length < 6) {
     const used = new Set([jolly, superstar].filter(v => v != null));
     main = [];
