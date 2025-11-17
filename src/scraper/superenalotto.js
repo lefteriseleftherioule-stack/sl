@@ -399,16 +399,15 @@ export async function fetchCurrentJackpot() {
 export async function fetchLatestDraw() {
   const isComplete = d => d && Array.isArray(d.main) && d.main.length === 6 && d.jolly != null && d.superstar != null && d.date;
   try {
+    const $ = await load("https://www.superenalotto.net/en/results");
+    const list = parseArchiveFromDom($, 1, null);
+    if (list.length && isComplete(list[0])) return { source: "superenalotto.net", ...list[0] };
+  } catch {}
+  try {
     const $ = await load("https://www.superenalotto.com/en/");
     const el = findSectionElement($, "SuperEnalotto Last Draw");
     let parsed = el ? parseLatestDrawFromDom($, el) : parseLatestDrawFromText(findSectionText($, "SuperEnalotto Last Draw"));
     if (isComplete(parsed)) return { source: "superenalotto.com", ...parsed };
-  } catch {}
-  try {
-    const $ = await load("https://www.superenalotto.net/en/");
-    const el = findSectionElement($, "Latest Result");
-    let parsed = el ? parseLatestDrawFromDom($, el) : parseLatestDrawFromText(findSectionText($, "Latest Result"));
-    if (isComplete(parsed)) return { source: "superenalotto.net", ...parsed };
   } catch {}
   try {
     const prev = await fetchPreviousDraws(1, null);
