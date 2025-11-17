@@ -7,7 +7,13 @@ export default async function handler(req, res) {
       process.env.DEBUG_SUPERSTAR = '1';
       globalThis.__SUPERSTAR_DEBUG__ = [];
     }
-    const { fetchCurrentJackpot, fetchUnifiedResults } = await import("../src/scraper/superenalotto.js");
+    const mod = await import("../src/scraper/superenalotto.js");
+    let { fetchCurrentJackpot, fetchUnifiedResults } = mod || {};
+    if (typeof fetchCurrentJackpot !== 'function' || typeof fetchUnifiedResults !== 'function') {
+      const def = mod && mod.default ? mod.default : {};
+      fetchCurrentJackpot = typeof def.fetchCurrentJackpot === 'function' ? def.fetchCurrentJackpot : fetchCurrentJackpot;
+      fetchUnifiedResults = typeof def.fetchUnifiedResults === 'function' ? def.fetchUnifiedResults : fetchUnifiedResults;
+    }
     const limit = Number.isInteger(Number(limitParam)) ? Math.max(1, Math.min(50, Number(limitParam))) : 10;
     let jackpot = null, latest = null, previous = null;
     const errors = {};
@@ -16,6 +22,9 @@ export default async function handler(req, res) {
       const unified = await fetchUnifiedResults(limit);
       latest = unified?.latest || null;
       previous = unified?.previous || null;
+      const swapJS = d => (d ? { ...d, jolly: d?.superstar ?? d?.jolly ?? null, superstar: d?.jolly ?? d?.superstar ?? null } : null);
+      if (latest) latest = swapJS(latest);
+      if (previous && Array.isArray(previous.draws)) previous = { ...previous, draws: previous.draws.map(swapJS) };
     } catch (e) { errors.unified = e?.message || String(e); }
     const debug = wantDebug ? (globalThis.__SUPERSTAR_DEBUG__ || []) : undefined;
     res.setHeader("Cache-Control", "s-maxage=300, stale-while-revalidate=600");
