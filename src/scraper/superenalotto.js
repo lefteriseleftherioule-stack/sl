@@ -228,13 +228,13 @@ function parseArchiveFromDom($, limit = 20, excludeDate = null) {
     const drawNoMatch = seg.match(/\b(\d{1,3}\/\d{2})\b/) || seg.match(/Drawing\s*n\.?\s*([0-9]+)/i);
     const drawNo = drawNoMatch ? drawNoMatch[1] : null;
     const tokens = [];
-    let jLabelEl = null, sLabelEl = null;
-    container.find("*").each((_, nd) => {
-      const t = normalizeText($(nd).text() || "");
-      if (/^\d{1,2}$/.test(t)) tokens.push({ type: "num", value: parseInt(t,10) });
-      else if (/\bJolly\b/i.test(t)) { tokens.push({ type: "label", value: "jolly" }); if (!jLabelEl) jLabelEl = nd; }
-      else if (/\b(?:Super\s*Star|Superstar|SuperStar)\b/i.test(t)) { tokens.push({ type: "label", value: "superstar" }); if (!sLabelEl) sLabelEl = nd; }
-    });
+let jLabelEl = null, sLabelEl = null;
+container.find("*").each((_, nd) => {
+  const t = normalizeText($(nd).text() || "");
+  if (/^\d{1,2}$/.test(t)) tokens.push({ type: "num", value: parseInt(t,10), el: nd });
+  else if (/\bJolly\b/i.test(t)) { tokens.push({ type: "label", value: "jolly" }); if (!jLabelEl) jLabelEl = nd; }
+  else if (/\b(?:Super\s*Star|Superstar|SuperStar)\b/i.test(t)) { tokens.push({ type: "label", value: "superstar" }); if (!sLabelEl) sLabelEl = nd; }
+});
     const jIdxTok = tokens.findIndex(t => t.type === "label" && t.value === "jolly");
     const sIdxTok = tokens.findIndex(t => t.type === "label" && t.value === "superstar");
     if (jIdxTok >= 0 && sIdxTok >= 0 && drawNo) {
@@ -259,16 +259,20 @@ function parseArchiveFromDom($, limit = 20, excludeDate = null) {
         }
         return null;
       };
+      const isDateContext = (node) => {
+        const ctx = normalizeText($(node).closest("section, article, li, tr, div").text() || "");
+        return /(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)/i.test(ctx) || dateRegex.test(ctx);
+      };
       const pickNearStar = (el) => {
         if (!el) return null;
         let val = null;
         $(el).nextAll().slice(0,15).each((_, sib) => {
           if (val != null) return false;
           const t = ($(sib).text() || "").trim();
-          if (/^\d{1,2}$/.test(t)) { const v = parseInt(t,10); if (v >= 1 && v <= 90 && v !== dayNum && !main.includes(v)) { val = v; return false; } }
+          if (/^\d{1,2}$/.test(t)) { const v = parseInt(t,10); if (v >= 1 && v <= 90 && v !== dayNum && !main.includes(v) && !isDateContext(sib)) { val = v; return false; } }
           $(sib).find("li, span, div, b, strong").each((_, nd) => {
             const tt = ($(nd).text() || "").trim();
-            if (/^\d{1,2}$/.test(tt)) { const v = parseInt(tt,10); if (v >= 1 && v <= 90 && v !== dayNum && !main.includes(v)) { val = v; return false; } }
+            if (/^\d{1,2}$/.test(tt)) { const v = parseInt(tt,10); if (v >= 1 && v <= 90 && v !== dayNum && !main.includes(v) && !isDateContext(nd)) { val = v; return false; } }
           });
         });
         return val;
@@ -279,6 +283,8 @@ function parseArchiveFromDom($, limit = 20, excludeDate = null) {
         const t = tokens[i];
         if (t.type === "num") {
           const v = t.value;
+          const node = t.el;
+          if (isDateContext(node)) continue;
           if ((dayNum == null || v !== dayNum) && v !== jolly && !main.includes(v)) { superstar = v; break; }
         }
       }
@@ -398,7 +404,7 @@ function parseArchiveTextToDraws(text, limit = 20) {
         }
       }
       if (jolly != null && superstar != null) {
-        results.push({ date: normalizeText(date), main, jolly: superstar, superstar: jolly });
+        results.push({ date: normalizeText(date), main, jolly, superstar });
       }
     }
   }
