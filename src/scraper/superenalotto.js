@@ -212,7 +212,7 @@ function parseArchiveFromDom($, limit = 20, excludeDate = null) {
     const tokens = [];
     container.find("*").each((_, nd) => {
       const t = normalizeText($(nd).text() || "");
-      if (/^\d{1,2}$/.test(t)) tokens.push({ type: "num", value: parseInt(t,10) });
+      if (/^\d{1,2}$/.test(t)) tokens.push({ type: "num", value: parseInt(t,10), el: nd });
       else if (/\bJolly\b/i.test(t)) tokens.push({ type: "label", value: "jolly" });
       else if (/\b(?:Super\s*Star|Superstar|SuperStar)\b/i.test(t)) tokens.push({ type: "label", value: "superstar" });
     });
@@ -230,8 +230,22 @@ function parseArchiveFromDom($, limit = 20, excludeDate = null) {
       }
       const pickAfter = (idx) => { if (idx < 0) return null; for (let i = idx + 1; i < tokens.length; i++) { if (tokens[i].type === "num") return tokens[i].value; } return null; };
       const pickAfterSkipDay = (idx) => { if (idx < 0) return null; for (let i = idx + 1; i < tokens.length; i++) { if (tokens[i].type === "num") { const v = tokens[i].value; if (dayNum != null && v === dayNum) continue; return v; } } return null; };
+      const isDateContext = (node) => {
+        const ctx = normalizeText($(node).closest("section, article, li, tr, div").text() || "");
+        return /(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)/i.test(ctx) || dateRegex.test(ctx) || new RegExp(`\\b(?:${monthNames.join("|")})\\b`, "i").test(ctx);
+      };
       const jolly = pickAfter(jIdxTok);
-      const superstar = pickAfterSkipDay(sIdxTok);
+      let superstar = null;
+      for (let i = sIdxTok + 1; i < tokens.length; i++) {
+        const t = tokens[i];
+        if (t.type === "num") {
+          const v = t.value;
+          const node = t.el;
+          if (node && isDateContext(node)) continue;
+          if ((dayNum == null || v !== dayNum) && v !== jolly && !main.includes(v)) { superstar = v; break; }
+        }
+      }
+      if (superstar == null) superstar = pickAfterSkipDay(sIdxTok);
       if (main.length === 6 && jolly != null && superstar != null) {
         results.push({ date: dateCanon, draw: drawNo, main, jolly: superstar, superstar: jolly });
       }
