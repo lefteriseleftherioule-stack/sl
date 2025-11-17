@@ -274,7 +274,15 @@ function parseArchiveFromDom($, limit = 20, excludeDate = null) {
         return val;
       };
       const jolly = pickAfter(jIdxTok);
-      let superstar = pickNearStar(sLabelEl) || pickAfterSkipDay(sIdxTok);
+      let superstar = null;
+      for (let i = sIdxTok + 1; i < tokens.length; i++) {
+        const t = tokens[i];
+        if (t.type === "num") {
+          const v = t.value;
+          if ((dayNum == null || v !== dayNum) && v !== jolly && !main.includes(v)) { superstar = v; break; }
+        }
+      }
+      if (superstar == null) superstar = pickNearStar(sLabelEl) || pickAfterSkipDay(sIdxTok);
       if (main.length === 6 && jolly != null && superstar != null) {
         results.push({ date: dateCanon, draw: drawNo, main, jolly, superstar });
       }
@@ -354,7 +362,7 @@ function parseLatestDrawFromText(text) {
     || text.match(new RegExp(`\\b\\d{1,2}(?:st|nd|rd|th)?\\s+(?:${monthNames.join("|")})\\s+\\d{4}\\b`, "i"))
     || text.match(new RegExp(`\\b(?:${monthNames.join("|")})\\s+\\d{1,2}(?:st|nd|rd|th)?(?:,)?\\s+\\d{4}\\b`, "i"));
   const drawNoMatch = text.match(/Drawing\s*n\.?\s*([0-9]+)/i) || text.match(/\((\d{1,3}\/\d{2})\)/);
-  return { main, jolly: superstar, superstar: jolly, date: dateMatch ? normalizeText(dateMatch[0]) : null, draw: drawNoMatch ? drawNoMatch[1] : null };
+  return { main, jolly, superstar, date: dateMatch ? normalizeText(dateMatch[0]) : null, draw: drawNoMatch ? drawNoMatch[1] : null };
 }
 
 function parseArchiveTextToDraws(text, limit = 20) {
