@@ -328,10 +328,10 @@ function parseLatestDrawFromText(text) {
       const look = text.slice(idx, idx + 25);
       const isDateNumber = new RegExp(`^\\d{1,2}\\s+(?:${monthNames.join("|")})`, "i").test(look);
       tokens.push({ type: "num", value: parseInt(s, 10), index: idx, isDateNumber });
+    } else if (/(?:Super\s*Star|Superstar|SuperStar)/i.test(s)) {
+      tokens.push({ type: "label", value: "superstar", index: idx });
     } else if (/Jolly/i.test(s)) {
       tokens.push({ type: "label", value: "jolly", index: idx });
-    } else {
-      tokens.push({ type: "label", value: "superstar", index: idx });
     }
   }
   const jIdx = tokens.findIndex(t => t.type === "label" && t.value === "jolly");
