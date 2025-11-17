@@ -180,7 +180,7 @@ function parseLatestDrawFromDom($, root) {
   const text = normalizeText($(root).text() || "");
   const dateMatch = text.match(new RegExp(`(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\\s+\\d{1,2}\\s+(?:${monthNames.join("|")})\\s+\\d{4}`, "i"));
   const drawNoMatch = text.match(/Drawing\s*n\.?\s*([0-9]+)/i) || text.match(/\((\d{1,3}\/\d{2})\)/);
-  return { main, jolly: superstar, superstar: jolly, date: dateMatch ? normalizeText(dateMatch[0]) : null, draw: drawNoMatch ? drawNoMatch[1] : null };
+  return { main, jolly, superstar, date: dateMatch ? normalizeText(dateMatch[0]) : null, draw: drawNoMatch ? drawNoMatch[1] : null };
 }
 
 function parseArchiveFromDom($, limit = 20, excludeDate = null) {
@@ -240,7 +240,7 @@ function parseArchiveFromDom($, limit = 20, excludeDate = null) {
       }
       if (superstar == null) superstar = pickAfter(sIdxTok);
       if (main.length === 6 && jolly != null && superstar != null) {
-        results.push({ date: dateCanon, draw: drawNo, main, jolly: superstar, superstar: jolly });
+        results.push({ date: dateCanon, draw: drawNo, main, jolly, superstar });
       }
     }
   });
@@ -301,7 +301,7 @@ function parseLatestDrawFromText(text) {
     || text.match(new RegExp(`\\b\\d{1,2}(?:st|nd|rd|th)?\\s+(?:${monthNames.join("|")})\\s+\\d{4}\\b`, "i"))
     || text.match(new RegExp(`\\b(?:${monthNames.join("|")})\\s+\\d{1,2}(?:st|nd|rd|th)?(?:,)?\\s+\\d{4}\\b`, "i"));
   const drawNoMatch = text.match(/Drawing\s*n\.?\s*([0-9]+)/i) || text.match(/\((\d{1,3}\/\d{2})\)/);
-  return { main, jolly: superstar, superstar: jolly, date: dateMatch ? normalizeText(dateMatch[0]) : null, draw: drawNoMatch ? drawNoMatch[1] : null };
+  return { main, jolly, superstar, date: dateMatch ? normalizeText(dateMatch[0]) : null, draw: drawNoMatch ? drawNoMatch[1] : null };
 }
 
 function parseArchiveTextToDraws(text, limit = 20) {
@@ -337,7 +337,7 @@ function parseArchiveTextToDraws(text, limit = 20) {
         }
       }
       if (jolly != null && superstar != null) {
-        results.push({ date: normalizeText(date), main, jolly: superstar, superstar: jolly });
+        results.push({ date: normalizeText(date), main, jolly, superstar });
       }
     }
   }
