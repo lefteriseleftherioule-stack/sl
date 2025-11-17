@@ -74,19 +74,46 @@ function equalsDate(a, b) {
 
 function parseLatestDrawFromDom($, root) {
   const text = normalizeText($(root).text() || "");
-  const jMatch = text.match(/\bJolly\b[^0-9]*(\d{1,2})/i);
-  const sMatch = text.match(/\b(?:Super\s*Star|Superstar|SuperStar)\b[^0-9]*(\d{1,2})/i);
-  const jolly = jMatch ? parseInt(jMatch[1], 10) : null;
-  const superstar = sMatch ? parseInt(sMatch[1], 10) : null;
   const nums = [];
   $(root).find("span,div,li,b,strong").each((_, el) => {
     const t = ($(el).text() || "").trim();
     if (/^\d{1,2}$/.test(t)) nums.push(parseInt(t, 10));
   });
+  const findLabelEl = (re) => {
+    let node = null;
+    $(root).find("*").each((_, el) => {
+      const t = normalizeText($(el).text() || "");
+      if (!node && re.test(t)) node = el;
+    });
+    return node;
+  };
+  const pickNearNumber = (el) => {
+    if (!el) return null;
+    let val = null;
+    $(el).find("span,div,li,b,strong").each((_, node) => {
+      const t = ($(node).text() || "").trim();
+      if (/^\d{1,2}$/.test(t)) { val = parseInt(t,10); return false; }
+    });
+    if (val != null) return val;
+    $(el).nextAll().slice(0,5).each((_, sib) => {
+      if (val != null) return false;
+      const tt = ($(sib).text() || "").trim();
+      if (/^\d{1,2}$/.test(tt)) { val = parseInt(tt,10); return false; }
+      $(sib).find("span,div,li,b,strong").each((_, node) => {
+        const tn = ($(node).text() || "").trim();
+        if (/^\d{1,2}$/.test(tn)) { val = parseInt(tn,10); return false; }
+      });
+    });
+    return val;
+  };
+  const jEl = findLabelEl(/\bJolly\b/i);
+  const sEl = findLabelEl(/\b(?:Super\s*Star|Superstar|SuperStar)\b/i);
+  const jolly = pickNearNumber(jEl);
+  const superstar = pickNearNumber(sEl);
   const main = [];
-  const used = new Set();
+  const used = new Set([jolly, superstar].filter(v => v != null));
   for (const n of nums) {
-    if (n >= 1 && n <= 90 && n !== jolly && n !== superstar && !used.has(n)) {
+    if (n >= 1 && n <= 90 && !used.has(n)) {
       main.push(n);
       used.add(n);
       if (main.length === 6) break;
