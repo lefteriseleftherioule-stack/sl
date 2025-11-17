@@ -236,16 +236,38 @@ function parseArchiveFromDom($, limit = 20, excludeDate = null) {
       };
       const jolly = pickAfter(jIdxTok);
       let superstar = null;
+      const isValid = (v) => (dayNum == null || v !== dayNum) && v !== jolly && !main.includes(v);
       for (let i = sIdxTok + 1; i < tokens.length; i++) {
         const t = tokens[i];
         if (t.type === "num") {
           const v = t.value;
           const node = t.el;
           if (node && isDateContext(node)) continue;
-          if ((dayNum == null || v !== dayNum) && v !== jolly && !main.includes(v)) { superstar = v; break; }
+          if (isValid(v)) { superstar = v; break; }
         }
       }
-      if (superstar == null) superstar = pickAfterSkipDay(sIdxTok);
+      if (superstar == null) {
+        for (let i = sIdxTok - 1; i >= 0; i--) {
+          const t = tokens[i];
+          if (t.type === "num") {
+            const v = t.value;
+            const node = t.el;
+            if (node && isDateContext(node)) continue;
+            if (isValid(v)) { superstar = v; break; }
+          }
+        }
+      }
+      if (superstar == null) {
+        for (let i = 0; i < tokens.length; i++) {
+          const t = tokens[i];
+          if (t.type === "num") {
+            const v = t.value;
+            const node = t.el;
+            if (node && isDateContext(node)) continue;
+            if (isValid(v)) { superstar = v; break; }
+          }
+        }
+      }
       if (main.length === 6 && jolly != null && superstar != null) {
         results.push({ date: dateCanon, draw: drawNo, main, jolly: superstar, superstar: jolly });
       }
