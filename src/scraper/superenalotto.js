@@ -73,35 +73,106 @@ function equalsDate(a, b) {
 }
 
 function parseLatestDrawFromDom($, root) {
-  const tokens = [];
-  $(root).find("*").each((_, el) => {
-    const t = normalizeText($(el).text() || "");
-    if (/^\d{1,2}$/.test(t)) tokens.push({ type: "num", value: parseInt(t,10) });
-    else if (/\bJolly\b/i.test(t)) tokens.push({ type: "label", value: "jolly" });
-    else if (/\b(?:Super\s*Star|Superstar|SuperStar)\b/i.test(t)) tokens.push({ type: "label", value: "superstar" });
-  });
-  const jIdx = tokens.findIndex(t => t.type === "label" && t.value === "jolly");
-  const sIdx = tokens.findIndex(t => t.type === "label" && t.value === "superstar");
-  const firstLabelIdx = [jIdx, sIdx].filter(i => i >= 0).length ? Math.min(...[jIdx, sIdx].filter(i => i >= 0)) : -1;
-  const head = firstLabelIdx >= 0 ? tokens.slice(0, firstLabelIdx) : tokens;
-  let main = [];
-  for (let i = head.length - 1; i >= 0 && main.length < 6; i--) {
-    const t = head[i];
-    if (t.type === "num" && !main.includes(t.value)) main.unshift(t.value);
-  }
-  const pickAfter = (idx) => {
-    if (idx < 0) return null;
-    for (let i = idx + 1; i < tokens.length; i++) { if (tokens[i].type === "num") return tokens[i].value; }
-    return null;
+  const collectNums = (node) => {
+    const arr = [];
+    $(node).find("li, span, div, b, strong").each((_, el) => {
+      const t = ($(el).text() || "").trim();
+      if (/^\d{1,2}$/.test(t)) {
+        const n = parseInt(t,10);
+        if (n >= 1 && n <= 90) arr.push(n);
+      }
+    });
+    return arr;
   };
-  const jolly = pickAfter(jIdx);
-  const superstar = pickAfter(sIdx);
-  if (main.length < 6) {
-    const used = new Set([jolly, superstar].filter(v => v != null));
+  let main = null;
+  $(root).find("ul, ol, div, section").each((_, el) => {
+    const nums = collectNums(el);
+    const uniq = [...new Set(nums)];
+    if (!main && uniq.length === 6) main = uniq;
+  });
+  if (!main) {
+    const tokens = [];
+    $(root).find("*").each((_, el) => {
+      const t = normalizeText($(el).text() || "");
+      if (/^\d{1,2}$/.test(t)) {
+        const v = parseInt(t,10);
+        if (v >= 1 && v <= 90) tokens.push({ type: "num", value: v });
+      } else if (/\bJolly\b/i.test(t)) tokens.push({ type: "label", value: "jolly" });
+      else if (/\b(?:Super\s*Star|Superstar|SuperStar)\b/i.test(t)) tokens.push({ type: "label", value: "superstar" });
+    });
+    const jIdx = tokens.findIndex(t => t.type === "label" && t.value === "jolly");
+    const sIdx = tokens.findIndex(t => t.type === "label" && t.value === "superstar");
+    const firstLabelIdx = [jIdx, sIdx].filter(i => i >= 0).length ? Math.min(...[jIdx, sIdx].filter(i => i >= 0)) : -1;
+    const head = firstLabelIdx >= 0 ? tokens.slice(0, firstLabelIdx) : tokens;
     main = [];
-    for (const t of tokens) {
-      if (t.type === "num" && !used.has(t.value) && !main.includes(t.value)) {
-        main.push(t.value);
+    for (let i = head.length - 1; i >= 0 && main.length < 6; i--) {
+      const t = head[i];
+      if (t.type === "num" && !main.includes(t.value)) main.unshift(t.value);
+    }
+  }
+  const findLabelEl = (re) => {
+    let node = null;
+    $(root).find("*").each((_, el) => {
+      const t = normalizeText($(el).text() || "");
+      if (!node && re.test(t)) node = el;
+    });
+    return node;
+  };
+  const pickNear = (el) => {
+    if (!el) return null;
+    let val = null;
+    $(el).find("li, span, div, b, strong").each((_, nd) => {
+      const tt = ($(nd).text() || "").trim();
+      if (/^\d{1,2}$/.test(tt)) { const v = parseInt(tt,10); if (v >= 1 && v <= 90) { val = v; return false; } }
+    });
+    if (val != null) return val;
+    $(el).nextAll().slice(0,5).each((_, sib) => {
+      if (val != null) return false;
+      const t = ($(sib).text() || "").trim();
+      if (/^\d{1,2}$/.test(t)) { const v = parseInt(t,10); if (v >= 1 && v <= 90) { val = v; return false; } }
+      $(sib).find("li, span, div, b, strong").each((_, nd) => {
+        const tt = ($(nd).text() || "").trim();
+        if (/^\d{1,2}$/.test(tt)) { const v = parseInt(tt,10); if (v >= 1 && v <= 90) { val = v; return false; } }
+      });
+    });
+    return val;
+  };
+  const jEl = findLabelEl(/\bJolly\b/i);
+  const sEl = findLabelEl(/\b(?:Super\s*Star|Superstar|SuperStar)\b/i);
+  let jolly = pickNear(jEl);
+  let superstar = pickNear(sEl);
+  if (jolly == null || superstar == null) {
+    const tokens2 = [];
+    $(root).find("*").each((_, el) => {
+      const t = normalizeText($(el).text() || "");
+      if (/^\d{1,2}$/.test(t)) {
+        const v = parseInt(t,10);
+        if (v >= 1 && v <= 90) tokens2.push({ type: "num", value: v });
+      } else if (/\bJolly\b/i.test(t)) tokens2.push({ type: "label", value: "jolly" });
+      else if (/\b(?:Super\s*Star|Superstar|SuperStar)\b/i.test(t)) tokens2.push({ type: "label", value: "superstar" });
+    });
+    const jIdx2 = tokens2.findIndex(t => t.type === "label" && t.value === "jolly");
+    const sIdx2 = tokens2.findIndex(t => t.type === "label" && t.value === "superstar");
+    const pickAfter2 = (idx) => {
+      if (idx < 0) return null;
+      for (let i = idx + 1; i < tokens2.length; i++) { if (tokens2[i].type === "num") return tokens2[i].value; }
+      return null;
+    };
+    if (jolly == null) jolly = pickAfter2(jIdx2);
+    if (superstar == null) superstar = pickAfter2(sIdx2);
+  }
+  if (Array.isArray(main)) {
+    main = main.filter(n => n !== jolly && n !== superstar);
+    if (main.length > 6) main = main.slice(0,6);
+  } else {
+    main = [];
+  }
+  if (main.length < 6) {
+    const numsAll = collectNums(root);
+    const used = new Set([jolly, superstar].filter(v => v != null));
+    for (const n of numsAll) {
+      if (!used.has(n) && !main.includes(n)) {
+        main.push(n);
         if (main.length === 6) break;
       }
     }
