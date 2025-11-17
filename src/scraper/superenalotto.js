@@ -46,30 +46,36 @@ function findSectionElement($, marker) {
 
 function toCanonicalDate(str) {
   if (!str) return null;
-  const m = str.match(new RegExp(`\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+(?:${monthNames.join("|")})\\s+(\\d{4})\\b`, "i"));
-  if (m) return `${parseInt(m[1],10)} ${m[0].split(/\s+/)[1]} ${m[2]}`;
-  const m2 = str.match(new RegExp(`\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+(?:${monthNames.join("|")})\\b`, "i"));
-  return m2 ? `${parseInt(m2[1],10)} ${m2[0].split(/\s+/)[1]}` : null;
+  const a = str.match(new RegExp(`\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+(?:${monthNames.join("|")})\\s+(\\d{4})\\b`, "i"));
+  if (a) return `${parseInt(a[1],10)} ${a[0].split(/\s+/)[1]} ${a[2]}`;
+  const b = str.match(new RegExp(`\\b(?:${monthNames.join("|")})\\s+(\\d{1,2})(?:st|nd|rd|th)?(?:,)?\\s+(\\d{4})\\b`, "i"));
+  if (b) return `${parseInt(b[1],10)} ${b[0].split(/\s+/)[0]} ${b[2]}`;
+  const c = str.match(new RegExp(`\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+(?:${monthNames.join("|")})\\b`, "i"));
+  if (c) return `${parseInt(c[1],10)} ${c[0].split(/\s+/)[1]}`;
+  const d = str.match(new RegExp(`\\b(?:${monthNames.join("|")})\\s+(\\d{1,2})(?:st|nd|rd|th)?\\b`, "i"));
+  return d ? `${parseInt(d[1],10)} ${d[0].split(/\s+/)[0]}` : null;
 }
 
 function equalsDate(a, b) {
   const norm = s => (s || "").replace(/\s+/g, " ").trim();
   const sa = norm(a), sb = norm(b);
-  const rx = new RegExp(`\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+(?:${monthNames.join("|")})\\b`, "i");
-  const ry = /\\b(\\d{4})\\b/;
-  const ma = sa.match(rx), mb = sb.match(rx);
+  const rx1 = new RegExp(`\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+(?:${monthNames.join("|")})\\b`, "i");
+  const rx2 = new RegExp(`\\b(?:${monthNames.join("|")})\\s+(\\d{1,2})(?:st|nd|rd|th)?\\b`, "i");
+  const ry = /\b(\d{4})\b/;
+  const ma = sa.match(rx1) || sa.match(rx2);
+  const mb = sb.match(rx1) || sb.match(rx2);
   if (!ma || !mb) return sa.toLowerCase() === sb.toLowerCase();
-  const dayA = parseInt(ma[1],10), monthA = ma[0].split(/\s+/)[1].toLowerCase();
-  const dayB = parseInt(mb[1],10), monthB = mb[0].split(/\s+/)[1].toLowerCase();
+  const partsA = /^(\d{1,2})/.test(ma[0]) ? [parseInt(ma[1],10), ma[0].split(/\s+/)[1].toLowerCase()] : [parseInt(ma[1],10), ma[0].split(/\s+/)[0].toLowerCase()];
+  const partsB = /^(\d{1,2})/.test(mb[0]) ? [parseInt(mb[1],10), mb[0].split(/\s+/)[1].toLowerCase()] : [parseInt(mb[1],10), mb[0].split(/\s+/)[0].toLowerCase()];
   const ya = (sa.match(ry) || [null])[1], yb = (sb.match(ry) || [null])[1];
-  if (ya && yb) return dayA === dayB && monthA === monthB && ya === yb;
-  return dayA === dayB && monthA === monthB;
+  if (ya && yb) return partsA[0] === partsB[0] && partsA[1] === partsB[1] && ya === yb;
+  return partsA[0] === partsB[0] && partsA[1] === partsB[1];
 }
 
 function parseLatestDrawFromDom($, root) {
   const text = normalizeText($(root).text() || "");
-  const jMatch = text.match(/(?:^|\s)(\d{1,2})\s*Jolly\b/i) || text.match(/\bJolly\s*(\d{1,2})\b/i);
-  const sMatch = text.match(/(?:^|\s)(\d{1,2})\s*(?:Super\s*Star|Superstar)\b/i) || text.match(/\b(?:Super\s*Star|Superstar)\s*(\d{1,2})\b/i);
+  const jMatch = text.match(/\bJolly\b\s*:?\s*(\d{1,2})/i) || text.match(/(?:^|\s)(\d{1,2})\s*\bJolly\b\s*:?/i);
+  const sMatch = text.match(/\b(?:Super\s*Star|Superstar|SuperStar)\b\s*:?\s*(\d{1,2})/i) || text.match(/(?:^|\s)(\d{1,2})\s*\b(?:Super\s*Star|Superstar|SuperStar)\b\s*:?/i);
   const jolly = jMatch ? parseInt(jMatch[1], 10) : null;
   const superstar = sMatch ? parseInt(sMatch[1], 10) : null;
   const nums = [];
@@ -129,12 +135,13 @@ function parseArchiveFromDom($, limit = 20, excludeDate = null) {
     const cutIdx = cutIdxs.length ? Math.min(...cutIdxs) : -1;
     const preMainText = cutIdx >= 0 ? block.slice(0, cutIdx) : block;
     const nums = (preMainText.match(/\b\d{1,2}\b/g) || []).map(n => parseInt(n,10)).filter(n => n >= 1 && n <= 90);
-    const day = parseInt(dateCanon.split(' ')[0], 10);
+    const dayMatch = dateCanon.match(/\b\d{1,2}\b/);
+    const dayNum = dayMatch ? parseInt(dayMatch[0], 10) : null;
     const main = [];
     const used = new Set();
     for (let i = nums.length - 1; i >= 0 && main.length < 6; i--) {
       const n = nums[i];
-      if (n === day) continue;
+      if (dayNum != null && n === dayNum) continue;
       if (!used.has(n)) { main.unshift(n); used.add(n); }
     }
     let jolly = null, superstar = null;
@@ -142,7 +149,7 @@ function parseArchiveFromDom($, limit = 20, excludeDate = null) {
     const postSText = (() => { if (sIdxA >= 0 && sIdxB >= 0) return block.slice(Math.max(sIdxA, sIdxB)); if (sIdxA >= 0) return block.slice(sIdxA); if (sIdxB >= 0) return block.slice(sIdxB); return ''; })();
     const pickNext = (t) => {
       const arr = (t.match(/\b\d{1,2}\b/g) || []).map(v => parseInt(v,10)).filter(v => v >= 1 && v <= 90);
-      for (const v of arr) { if (v === day) continue; if (!used.has(v)) return v; }
+      for (const v of arr) { if (dayNum != null && v === dayNum) continue; if (!used.has(v)) return v; }
       return null;
     };
     jolly = pickNext(postJText);
@@ -181,8 +188,12 @@ function parseJackpotFromText(text) {
 function parseLatestDrawFromText(text) {
   const nums = extractAllNumbers(text);
   if (!nums.length) return null;
+  const jMatch = text.match(/\bJolly\b\s*:?\s*(\d{1,2})/i) || text.match(/(?:^|\s)(\d{1,2})\s*\bJolly\b\s*:?/i);
+  const sMatch = text.match(/\b(?:Super\s*Star|Superstar|SuperStar)\b\s*:?\s*(\d{1,2})/i) || text.match(/(?:^|\s)(\d{1,2})\s*\b(?:Super\s*Star|Superstar|SuperStar)\b\s*:?/i);
+  const jolly = jMatch ? parseInt(jMatch[1], 10) : null;
+  const superstar = sMatch ? parseInt(sMatch[1], 10) : null;
   const main = [];
-  const used = new Set();
+  const used = new Set([jolly, superstar].filter(v => v != null));
   for (const n of nums) {
     if (n >= 1 && n <= 90 && !used.has(n)) {
       main.push(n);
@@ -191,31 +202,28 @@ function parseLatestDrawFromText(text) {
     }
   }
   if (main.length < 6) return null;
-  let jolly = null, superstar = null;
-  for (const n of nums) {
-    if (main.includes(n)) continue;
-    if (jolly == null) { jolly = n; continue; }
-    if (superstar == null) { superstar = n; break; }
-  }
-  const dateMatch = text.match(new RegExp(`(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)[^\n]*?\b\d{1,2}(?:st|nd|rd|th)?\b[^\n]*?(January|February|March|April|May|June|July|August|September|October|November|December)[^\n]*?\b\d{4}\b`, "i"))
-    || text.match(new RegExp(`\b\d{1,2}(?:st|nd|rd|th)?\s+(?:${monthNames.join("|")})\s+\d{4}\b`, "i"));
+  const dateMatch = text.match(new RegExp(`(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)[^\n]*?\\b\\d{1,2}(?:st|nd|rd|th)?\\b[^\n]*?(January|February|March|April|May|June|July|August|September|October|November|December)[^\n]*?\\b\\d{4}\\b`, "i"))
+    || text.match(new RegExp(`\\b\\d{1,2}(?:st|nd|rd|th)?\\s+(?:${monthNames.join("|")})\\s+\\d{4}\\b`, "i"))
+    || text.match(new RegExp(`\\b(?:${monthNames.join("|")})\\s+\\d{1,2}(?:st|nd|rd|th)?(?:,)?\\s+\\d{4}\\b`, "i"));
   const drawNoMatch = text.match(/Drawing\s*n\.?\s*([0-9]+)/i) || text.match(/\((\d{1,3}\/\d{2})\)/);
   return { main, jolly, superstar, date: dateMatch ? normalizeText(dateMatch[0]) : null, draw: drawNoMatch ? drawNoMatch[1] : null };
 }
 
 function parseArchiveTextToDraws(text, limit = 20) {
   const results = [];
-  const dateRegex = new RegExp(`((?:\\d{1,2}(?:st|nd|rd|th)?\\s+(?:${monthNames.join("|")})\\s+\\d{4}))`, "g");
+  const dateRegex = new RegExp(`((?:\\d{1,2}(?:st|nd|rd|th)?\\s+(?:${monthNames.join("|")})\\s+\\d{4})|(?:${monthNames.join("|")})\\s+\\d{1,2}(?:st|nd|rd|th)?(?:,)?\\s+\\d{4})`, "g");
   let m;
   while ((m = dateRegex.exec(text)) && results.length < limit) {
     const date = m[1];
     const segment = text.slice(m.index, m.index + 600);
     const nums = extractAllNumbers(segment);
-    const day = parseInt(((toCanonicalDate(date) || date) || '').split(' ')[0], 10);
+    const canon = toCanonicalDate(date) || date;
+    const dayMatch = canon.match(/\b\d{1,2}\b/);
+    const day = dayMatch ? parseInt(dayMatch[0], 10) : null;
     const main = [];
     const used = new Set();
     for (const n of nums) {
-      if (n === day) continue;
+      if (day != null && n === day) continue;
       if (n >= 1 && n <= 90 && !used.has(n)) {
         main.push(n);
         used.add(n);
