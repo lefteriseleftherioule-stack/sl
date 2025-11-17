@@ -158,26 +158,8 @@ function parseLatestDrawFromDom($, root) {
       for (let i = idx + 1; i < tokens2.length; i++) { if (tokens2[i].type === "num") return tokens2[i].value; }
       return null;
     };
-    const dayNumFromRoot = (() => {
-      const tt = normalizeText($(root).text() || "");
-      const dmx = tt.match(new RegExp(`\\b\\d{1,2}(?:st|nd|rd|th)?\\s+(?:${monthNames.join("|")})\\s+\\d{4}\\b`, "i"))
-        || tt.match(new RegExp(`\\b(?:${monthNames.join("|")})\\s+\\d{1,2}(?:st|nd|rd|th)?(?:,)?\\s+\\d{4}\\b`, "i"));
-      const d = dmx ? (dmx[0].match(/\\b\\d{1,2}\\b/) || [null])[0] : null;
-      return d ? parseInt(d,10) : null;
-    })();
-    const pickAfter2SkipDay = (idx) => {
-      if (idx < 0) return null;
-      for (let i = idx + 1; i < tokens2.length; i++) {
-        if (tokens2[i].type === "num") {
-          const v = tokens2[i].value;
-          if (dayNumFromRoot != null && v === dayNumFromRoot) continue;
-          return v;
-        }
-      }
-      return null;
-    };
     if (jolly == null) jolly = pickAfter2(jIdx2);
-    if (superstar == null) superstar = pickAfter2SkipDay(sIdx2);
+    if (superstar == null) superstar = pickAfter2(sIdx2);
   }
   if (Array.isArray(main)) {
     main = main.filter(n => n !== jolly && n !== superstar);
@@ -198,7 +180,7 @@ function parseLatestDrawFromDom($, root) {
   const text = normalizeText($(root).text() || "");
   const dateMatch = text.match(new RegExp(`(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\\s+\\d{1,2}\\s+(?:${monthNames.join("|")})\\s+\\d{4}`, "i"));
   const drawNoMatch = text.match(/Drawing\s*n\.?\s*([0-9]+)/i) || text.match(/\((\d{1,3}\/\d{2})\)/);
-  return { main, jolly, superstar, date: dateMatch ? normalizeText(dateMatch[0]) : null, draw: drawNoMatch ? drawNoMatch[1] : null };
+  return { main, jolly: superstar, superstar: jolly, date: dateMatch ? normalizeText(dateMatch[0]) : null, draw: drawNoMatch ? drawNoMatch[1] : null };
 }
 
 function parseArchiveFromDom($, limit = 20, excludeDate = null) {
@@ -228,13 +210,12 @@ function parseArchiveFromDom($, limit = 20, excludeDate = null) {
     const drawNoMatch = seg.match(/\b(\d{1,3}\/\d{2})\b/) || seg.match(/Drawing\s*n\.?\s*([0-9]+)/i);
     const drawNo = drawNoMatch ? drawNoMatch[1] : null;
     const tokens = [];
-let jLabelEl = null, sLabelEl = null;
-container.find("*").each((_, nd) => {
-  const t = normalizeText($(nd).text() || "");
-  if (/^\d{1,2}$/.test(t)) tokens.push({ type: "num", value: parseInt(t,10), el: nd });
-  else if (/\bJolly\b/i.test(t)) { tokens.push({ type: "label", value: "jolly" }); if (!jLabelEl) jLabelEl = nd; }
-  else if (/\b(?:Super\s*Star|Superstar|SuperStar)\b/i.test(t)) { tokens.push({ type: "label", value: "superstar" }); if (!sLabelEl) sLabelEl = nd; }
-});
+    container.find("*").each((_, nd) => {
+      const t = normalizeText($(nd).text() || "");
+      if (/^\d{1,2}$/.test(t)) tokens.push({ type: "num", value: parseInt(t,10) });
+      else if (/\bJolly\b/i.test(t)) tokens.push({ type: "label", value: "jolly" });
+      else if (/\b(?:Super\s*Star|Superstar|SuperStar)\b/i.test(t)) tokens.push({ type: "label", value: "superstar" });
+    });
     const jIdxTok = tokens.findIndex(t => t.type === "label" && t.value === "jolly");
     const sIdxTok = tokens.findIndex(t => t.type === "label" && t.value === "superstar");
     if (jIdxTok >= 0 && sIdxTok >= 0 && drawNo) {
@@ -248,49 +229,18 @@ container.find("*").each((_, nd) => {
         if (t.type === "num" && (dayNum == null || t.value !== dayNum) && !main.includes(t.value)) main.unshift(t.value);
       }
       const pickAfter = (idx) => { if (idx < 0) return null; for (let i = idx + 1; i < tokens.length; i++) { if (tokens[i].type === "num") return tokens[i].value; } return null; };
-      const pickAfterSkipDay = (idx) => {
-        if (idx < 0) return null;
-        for (let i = idx + 1; i < tokens.length; i++) {
-          if (tokens[i].type === "num") {
-            const v = tokens[i].value;
-            if (dayNum != null && v === dayNum) continue;
-            return v;
-          }
-        }
-        return null;
-      };
-      const isDateContext = (node) => {
-        const ctx = normalizeText($(node).closest("section, article, li, tr, div").text() || "");
-        return /(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)/i.test(ctx) || dateRegex.test(ctx);
-      };
-      const pickNearStar = (el) => {
-        if (!el) return null;
-        let val = null;
-        $(el).nextAll().slice(0,15).each((_, sib) => {
-          if (val != null) return false;
-          const t = ($(sib).text() || "").trim();
-          if (/^\d{1,2}$/.test(t)) { const v = parseInt(t,10); if (v >= 1 && v <= 90 && v !== dayNum && !main.includes(v) && !isDateContext(sib)) { val = v; return false; } }
-          $(sib).find("li, span, div, b, strong").each((_, nd) => {
-            const tt = ($(nd).text() || "").trim();
-            if (/^\d{1,2}$/.test(tt)) { const v = parseInt(tt,10); if (v >= 1 && v <= 90 && v !== dayNum && !main.includes(v) && !isDateContext(nd)) { val = v; return false; } }
-          });
-        });
-        return val;
-      };
       const jolly = pickAfter(jIdxTok);
       let superstar = null;
       for (let i = sIdxTok + 1; i < tokens.length; i++) {
         const t = tokens[i];
         if (t.type === "num") {
           const v = t.value;
-          const node = t.el;
-          if (isDateContext(node)) continue;
           if ((dayNum == null || v !== dayNum) && v !== jolly && !main.includes(v)) { superstar = v; break; }
         }
       }
-      if (superstar == null) superstar = pickNearStar(sLabelEl) || pickAfterSkipDay(sIdxTok);
+      if (superstar == null) superstar = pickAfter(sIdxTok);
       if (main.length === 6 && jolly != null && superstar != null) {
-        results.push({ date: dateCanon, draw: drawNo, main, jolly, superstar });
+        results.push({ date: dateCanon, draw: drawNo, main, jolly: superstar, superstar: jolly });
       }
     }
   });
@@ -340,25 +290,8 @@ function parseLatestDrawFromText(text) {
     if (t.type === "num" && !main.includes(t.value)) main.unshift(t.value);
   }
   const pickAfter = (idx) => { if (idx < 0) return null; for (let i = idx + 1; i < tokens.length; i++) { if (tokens[i].type === "num") return tokens[i].value; } return null; };
-  const pickAfterSkipDay = (idx) => {
-    if (idx < 0) return null;
-    const dayNumFromText = (() => {
-      const dm = text.match(new RegExp(`\\b\\d{1,2}(?:st|nd|rd|th)?\\s+(?:${monthNames.join("|")})\\s+\\d{4}\\b`, "i"))
-        || text.match(new RegExp(`\\b(?:${monthNames.join("|")})\\s+\\d{1,2}(?:st|nd|rd|th)?(?:,)?\\s+\\d{4}\\b`, "i"));
-      const d = dm ? (dm[0].match(/\\b\\d{1,2}\\b/) || [null])[0] : null;
-      return d ? parseInt(d,10) : null;
-    })();
-    for (let i = idx + 1; i < tokens.length; i++) {
-      if (tokens[i].type === "num") {
-        const v = tokens[i].value;
-        if (dayNumFromText != null && v === dayNumFromText) continue;
-        return v;
-      }
-    }
-    return null;
-  };
   const jolly = pickAfter(jIdx);
-  const superstar = pickAfterSkipDay(sIdx);
+  const superstar = pickAfter(sIdx);
   if (main.length < 6) {
     const used = new Set([jolly, superstar].filter(v => v != null));
     main = [];
@@ -368,7 +301,7 @@ function parseLatestDrawFromText(text) {
     || text.match(new RegExp(`\\b\\d{1,2}(?:st|nd|rd|th)?\\s+(?:${monthNames.join("|")})\\s+\\d{4}\\b`, "i"))
     || text.match(new RegExp(`\\b(?:${monthNames.join("|")})\\s+\\d{1,2}(?:st|nd|rd|th)?(?:,)?\\s+\\d{4}\\b`, "i"));
   const drawNoMatch = text.match(/Drawing\s*n\.?\s*([0-9]+)/i) || text.match(/\((\d{1,3}\/\d{2})\)/);
-  return { main, jolly, superstar, date: dateMatch ? normalizeText(dateMatch[0]) : null, draw: drawNoMatch ? drawNoMatch[1] : null };
+  return { main, jolly: superstar, superstar: jolly, date: dateMatch ? normalizeText(dateMatch[0]) : null, draw: drawNoMatch ? drawNoMatch[1] : null };
 }
 
 function parseArchiveTextToDraws(text, limit = 20) {
@@ -404,7 +337,7 @@ function parseArchiveTextToDraws(text, limit = 20) {
         }
       }
       if (jolly != null && superstar != null) {
-        results.push({ date: normalizeText(date), main, jolly, superstar });
+        results.push({ date: normalizeText(date), main, jolly: superstar, superstar: jolly });
       }
     }
   }
