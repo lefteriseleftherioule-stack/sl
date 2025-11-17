@@ -223,10 +223,10 @@ function parseArchiveFromDom($, limit = 20, excludeDate = null) {
       const head = firstLabelIdx >= 0 ? tokens.slice(0, firstLabelIdx) : tokens;
       const dayMatch = dateCanon.match(/\b\d{1,2}\b/);
       const dayNum = dayMatch ? parseInt(dayMatch[0], 10) : null;
-      const main = [];
-      for (let i = head.length - 1; i >= 0 && main.length < 6; i--) {
+      let main = [];
+      for (let i = 0; i < head.length && main.length < 6; i++) {
         const t = head[i];
-        if (t.type === "num" && (dayNum == null || t.value !== dayNum) && !main.includes(t.value)) main.unshift(t.value);
+        if (t.type === "num" && t.value >= 1 && t.value <= 90 && !main.includes(t.value)) main.push(t.value);
       }
       const pickAfter = (idx) => {
     if (idx < 0) return null;
