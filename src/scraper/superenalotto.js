@@ -74,8 +74,8 @@ function equalsDate(a, b) {
 
 function parseLatestDrawFromDom($, root) {
   const text = normalizeText($(root).text() || "");
-  const jMatch = text.match(/\bJolly\b\s*:?\s*(\d{1,2})/i) || text.match(/(?:^|\s)(\d{1,2})\s*\bJolly\b\s*:?/i);
-  const sMatch = text.match(/\b(?:Super\s*Star|Superstar|SuperStar)\b\s*:?\s*(\d{1,2})/i) || text.match(/(?:^|\s)(\d{1,2})\s*\b(?:Super\s*Star|Superstar|SuperStar)\b\s*:?/i);
+  const jMatch = text.match(/\bJolly\b[^0-9]*(\d{1,2})/i);
+  const sMatch = text.match(/\b(?:Super\s*Star|Superstar|SuperStar)\b[^0-9]*(\d{1,2})/i);
   const jolly = jMatch ? parseInt(jMatch[1], 10) : null;
   const superstar = sMatch ? parseInt(sMatch[1], 10) : null;
   const nums = [];
@@ -188,8 +188,8 @@ function parseJackpotFromText(text) {
 function parseLatestDrawFromText(text) {
   const nums = extractAllNumbers(text);
   if (!nums.length) return null;
-  const jMatch = text.match(/\bJolly\b\s*:?\s*(\d{1,2})/i) || text.match(/(?:^|\s)(\d{1,2})\s*\bJolly\b\s*:?/i);
-  const sMatch = text.match(/\b(?:Super\s*Star|Superstar|SuperStar)\b\s*:?\s*(\d{1,2})/i) || text.match(/(?:^|\s)(\d{1,2})\s*\b(?:Super\s*Star|Superstar|SuperStar)\b\s*:?/i);
+  const jMatch = text.match(/\bJolly\b[^0-9]*(\d{1,2})/i);
+  const sMatch = text.match(/\b(?:Super\s*Star|Superstar|SuperStar)\b[^0-9]*(\d{1,2})/i);
   const jolly = jMatch ? parseInt(jMatch[1], 10) : null;
   const superstar = sMatch ? parseInt(sMatch[1], 10) : null;
   const main = [];
