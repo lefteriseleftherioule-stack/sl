@@ -284,7 +284,7 @@ function parseArchiveFromDom($, limit = 20, excludeDate = null) {
         for (let i = sIdxTok + 1; i < tokens.length; i++) { const t = tokens[i]; if (t.type === "num") { superstar = t.value; break; } }
       }
       if (main.length === 6 && jolly != null && superstar != null) {
-        results.push({ date: dateCanon, draw: drawNo, main, jolly: superstar, superstar: jolly });
+        results.push({ date: dateCanon, draw: drawNo, main, jolly, superstar });
       }
     }
   });
