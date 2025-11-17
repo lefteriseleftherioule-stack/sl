@@ -228,7 +228,14 @@ function parseArchiveFromDom($, limit = 20, excludeDate = null) {
         const t = head[i];
         if (t.type === "num" && (dayNum == null || t.value !== dayNum) && !main.includes(t.value)) main.unshift(t.value);
       }
-      const pickAfter = (idx) => { if (idx < 0) return null; for (let i = idx + 1; i < tokens.length; i++) { if (tokens[i].type === "num") return tokens[i].value; } return null; };
+      const pickAfter = (idx) => {
+    if (idx < 0) return null;
+    for (let i = idx + 1; i < tokens.length; i++) {
+      const tk = tokens[i];
+      if (tk.type === "num" && !tk.isDateNumber) return tk.value;
+    }
+    return null;
+  };
       const pickAfterSkipDay = (idx) => { if (idx < 0) return null; for (let i = idx + 1; i < tokens.length; i++) { if (tokens[i].type === "num") { const v = tokens[i].value; if (dayNum != null && v === dayNum) continue; return v; } } return null; };
       const isDateContext = (node) => {
         const ctx = normalizeText($(node).closest("section, article, li, tr, div").text() || "");
@@ -316,9 +323,16 @@ function parseLatestDrawFromText(text) {
   const re = /\b(?:Jolly|Super\s*Star|Superstar|SuperStar)\b|\b\d{1,2}\b/gi;
   for (const m of text.matchAll(re)) {
     const s = m[0];
-    if (/^\d{1,2}$/.test(s)) tokens.push({ type: "num", value: parseInt(s,10), idx: m.index });
-    else if (/(?:Super\s*Star|Superstar|SuperStar)/i.test(s)) tokens.push({ type: "label", value: "superstar", idx: m.index });
-    else if (/Jolly/i.test(s)) tokens.push({ type: "label", value: "jolly", idx: m.index });
+    const idx = m.index || 0;
+    if (/^\d{1,2}$/.test(s)) {
+      const look = text.slice(idx, idx + 25);
+      const isDateNumber = new RegExp(`^\\d{1,2}\\s+(?:${monthNames.join("|")})`, "i").test(look);
+      tokens.push({ type: "num", value: parseInt(s, 10), index: idx, isDateNumber });
+    } else if (/Jolly/i.test(s)) {
+      tokens.push({ type: "label", value: "jolly", index: idx });
+    } else {
+      tokens.push({ type: "label", value: "superstar", index: idx });
+    }
   }
   const jIdx = tokens.findIndex(t => t.type === "label" && t.value === "jolly");
   const sIdx = tokens.findIndex(t => t.type === "label" && t.value === "superstar");
@@ -327,18 +341,20 @@ function parseLatestDrawFromText(text) {
   let main = [];
   for (let i = head.length - 1; i >= 0 && main.length < 6; i--) {
     const t = head[i];
-    if (t.type === "num" && !main.includes(t.value)) main.unshift(t.value);
+    if (t.type === "num" && !t.isDateNumber && !main.includes(t.value)) main.unshift(t.value);
   }
   const pickAfter = (idx) => { if (idx < 0) return null; for (let i = idx + 1; i < tokens.length; i++) { if (tokens[i].type === "num") return tokens[i].value; } return null; };
   const jolly = pickAfter(jIdx);
-  const superstar = (() => {
-    const next = tokens[sIdx + 1];
-    return next && next.type === "num" ? next.value : null;
-  })();
+  const superstar = pickAfter(sIdx);
   if (main.length < 6) {
     const used = new Set([jolly, superstar].filter(v => v != null));
     main = [];
-    for (const t of tokens) { if (t.type === "num" && !used.has(t.value) && !main.includes(t.value)) { main.push(t.value); if (main.length === 6) break; } }
+    for (const t of tokens) {
+      if (t.type === "num" && !t.isDateNumber && !used.has(t.value) && !main.includes(t.value)) {
+        main.push(t.value);
+        if (main.length === 6) break;
+      }
+    }
   }
   const dateMatch = text.match(new RegExp(`(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)[^\n]*?\\b\\d{1,2}(?:st|nd|rd|th)?\\b[^\n]*?(January|February|March|April|May|June|July|August|September|October|November|December)[^\n]*?\\b\\d{4}\\b`, "i"))
     || text.match(new RegExp(`\\b\\d{1,2}(?:st|nd|rd|th)?\\s+(?:${monthNames.join("|")})\\s+\\d{4}\\b`, "i"))
