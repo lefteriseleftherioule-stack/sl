@@ -325,7 +325,7 @@ function parseLatestDrawFromText(text) {
     const s = m[0];
     const idx = m.index || 0;
     if (/^\d{1,2}$/.test(s)) {
-      const look = text.slice(idx, idx + 25);
+      const look = text.slice(idx, idx + 40);
       const isDateNumber = new RegExp(`^\\d{1,2}\\s+(?:${monthNames.join("|")})`, "i").test(look);
       tokens.push({ type: "num", value: parseInt(s, 10), index: idx, isDateNumber });
     } else if (/(?:Super\s*Star|Superstar|SuperStar)/i.test(s)) {
@@ -345,7 +345,7 @@ function parseLatestDrawFromText(text) {
   }
   const pickAfter = (idx) => { if (idx < 0) return null; for (let i = idx + 1; i < tokens.length; i++) { if (tokens[i].type === "num") return tokens[i].value; } return null; };
   const jolly = pickAfter(jIdx);
-  const superstar = pickAfter(sIdx);
+  let superstar = pickAfter(sIdx);
   if (main.length < 6) {
     const used = new Set([jolly, superstar].filter(v => v != null));
     main = [];
@@ -359,6 +359,15 @@ function parseLatestDrawFromText(text) {
   const dateMatch = text.match(new RegExp(`(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)[^\n]*?\\b\\d{1,2}(?:st|nd|rd|th)?\\b[^\n]*?(January|February|March|April|May|June|July|August|September|October|November|December)[^\n]*?\\b\\d{4}\\b`, "i"))
     || text.match(new RegExp(`\\b\\d{1,2}(?:st|nd|rd|th)?\\s+(?:${monthNames.join("|")})\\s+\\d{4}\\b`, "i"))
     || text.match(new RegExp(`\\b(?:${monthNames.join("|")})\\s+\\d{1,2}(?:st|nd|rd|th)?(?:,)?\\s+\\d{4}\\b`, "i"));
+  const dayNum = (() => { const m = dateMatch ? dateMatch[0].match(/\b(\d{1,2})(?:st|nd|rd|th)?\b/) : null; return m ? parseInt(m[1],10) : null; })();
+  if (superstar != null && dayNum != null && superstar === dayNum) {
+    let nextStar = null;
+    for (let i = sIdx + 1; i < tokens.length; i++) {
+      const tk = tokens[i];
+      if (tk.type === "num" && !tk.isDateNumber && tk.value !== dayNum) { nextStar = tk.value; break; }
+    }
+    superstar = nextStar;
+  }
   const drawNoMatch = text.match(/Drawing\s*n\.?\s*([0-9]+)/i) || text.match(/\((\d{1,3}\/\d{2})\)/);
   return { main, jolly: superstar, superstar: jolly, date: dateMatch ? normalizeText(dateMatch[0]) : null, draw: drawNoMatch ? drawNoMatch[1] : null };
 }
