@@ -250,7 +250,19 @@ function parseArchiveFromDom($, limit = 20, excludeDate = null) {
       if (starScope.length) {
         const ssEl = starScope.find(".superstar, .super-star, .super_star").first();
         const ssTxt = (ssEl.text() || "").trim();
-        if (/^\d{1,2}$/.test(ssTxt)) superstar = parseInt(ssTxt,10);
+        if (/^\d{1,2}$/.test(ssTxt)) {
+          const v = parseInt(ssTxt,10);
+          if (v !== dayNum) superstar = v;
+        }
+        if (superstar == null) {
+          ssEl.find("li, span, div, b, strong").each((_, nd) => {
+            const tt = ($(nd).text() || "").trim();
+            if (/^\d{1,2}$/.test(tt)) {
+              const v = parseInt(tt,10);
+              if (v >= 1 && v <= 90 && v !== dayNum) { superstar = v; return false; }
+            }
+          });
+        }
       }
       const mainSet = new Set(main);
       const mainEls = [];
@@ -276,12 +288,20 @@ function parseArchiveFromDom($, limit = 20, excludeDate = null) {
           const tt = ($(nd).text() || "").trim();
           if (/^\d{1,2}$/.test(tt)) {
             const v = parseInt(tt,10);
-            if (v >= 1 && v <= 90 && v !== jolly) { superstar = v; return false; }
+            if (v >= 1 && v <= 90 && v !== jolly && v !== dayNum) { superstar = v; return false; }
           }
         });
       }
       if (superstar == null) {
-        for (let i = sIdxTok + 1; i < tokens.length; i++) { const t = tokens[i]; if (t.type === "num") { superstar = t.value; break; } }
+        for (let i = sIdxTok + 1; i < tokens.length; i++) {
+          const t = tokens[i];
+          if (t.type === "num") {
+            const v = t.value;
+            if (dayNum != null && v === dayNum) continue;
+            superstar = v;
+            break;
+          }
+        }
       }
       if (main.length === 6 && jolly != null && superstar != null) {
         results.push({ date: dateCanon, draw: drawNo, main, jolly, superstar });
