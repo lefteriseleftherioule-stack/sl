@@ -393,7 +393,7 @@ function parseArchiveTextToDraws(text, limit = 20) {
       let jolly = null, superstar = null;
       for (const n of nums) {
         if (main.includes(n)) continue;
-        if (jolly == null) { jolly = n; continue; }
+        if (jolly == null) { if (day != null && n === day) { } else { jolly = n; continue; } }
         if (superstar == null) {
           if (day != null && n === day) continue;
           superstar = n;
