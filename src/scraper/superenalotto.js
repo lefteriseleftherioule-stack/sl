@@ -74,52 +74,26 @@ function equalsDate(a, b) {
 
 function parseLatestDrawFromDom($, root) {
   const text = normalizeText($(root).text() || "");
-  const nums = [];
-  $(root).find("span,div,li,b,strong").each((_, el) => {
-    const t = ($(el).text() || "").trim();
-    if (/^\d{1,2}$/.test(t)) nums.push(parseInt(t, 10));
-  });
-  const findLabelEl = (re) => {
-    let node = null;
-    $(root).find("*").each((_, el) => {
-      const t = normalizeText($(el).text() || "");
-      if (!node && re.test(t)) node = el;
-    });
-    return node;
-  };
-  const pickNearNumber = (el) => {
-    if (!el) return null;
-    let val = null;
-    $(el).find("span,div,li,b,strong").each((_, node) => {
-      const t = ($(node).text() || "").trim();
-      if (/^\d{1,2}$/.test(t)) { val = parseInt(t,10); return false; }
-    });
-    if (val != null) return val;
-    $(el).nextAll().slice(0,5).each((_, sib) => {
-      if (val != null) return false;
-      const tt = ($(sib).text() || "").trim();
-      if (/^\d{1,2}$/.test(tt)) { val = parseInt(tt,10); return false; }
-      $(sib).find("span,div,li,b,strong").each((_, node) => {
-        const tn = ($(node).text() || "").trim();
-        if (/^\d{1,2}$/.test(tn)) { val = parseInt(tn,10); return false; }
-      });
-    });
-    return val;
-  };
-  const jEl = findLabelEl(/\bJolly\b/i);
-  const sEl = findLabelEl(/\b(?:Super\s*Star|Superstar|SuperStar)\b/i);
-  const jolly = pickNearNumber(jEl);
-  const superstar = pickNearNumber(sEl);
+  const jIdx = text.search(/\bJolly\b/i);
+  const sIdx = text.search(/\b(?:Super\s*Star|Superstar|SuperStar)\b/i);
+  const jMatch = text.match(/\bJolly\b[^0-9]*(\d{1,2})/i);
+  const sMatch = text.match(/\b(?:Super\s*Star|Superstar|SuperStar)\b[^0-9]*(\d{1,2})/i);
+  const jolly = jMatch ? parseInt(jMatch[1], 10) : null;
+  const superstar = sMatch ? parseInt(sMatch[1], 10) : null;
+  const cutoff = [jIdx, sIdx].filter(i => i >= 0);
+  const preMainText = cutoff.length ? text.slice(0, Math.min(...cutoff)) : text;
+  const nums = extractAllNumbers(preMainText);
+  const dateMatch = text.match(new RegExp(`(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\\s+\\d{1,2}\\s+(?:${monthNames.join("|")})\\s+\\d{4}`, "i"));
+  const canon = toCanonicalDate(dateMatch ? dateMatch[0] : null) || (dateMatch ? dateMatch[0] : null) || "";
+  const dm = canon.match(/\b\d{1,2}\b/);
+  const dayNum = dm ? parseInt(dm[0], 10) : null;
   const main = [];
   const used = new Set([jolly, superstar].filter(v => v != null));
-  for (const n of nums) {
-    if (n >= 1 && n <= 90 && !used.has(n)) {
-      main.push(n);
-      used.add(n);
-      if (main.length === 6) break;
-    }
+  for (let i = nums.length - 1; i >= 0 && main.length < 6; i--) {
+    const n = nums[i];
+    if (dayNum != null && n === dayNum) continue;
+    if (!used.has(n) && !main.includes(n)) main.unshift(n);
   }
-  const dateMatch = text.match(new RegExp(`(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\\s+\\d{1,2}\\s+(?:${monthNames.join("|")})\\s+\\d{4}`, "i"));
   const drawNoMatch = text.match(/Drawing\s*n\.?\s*([0-9]+)/i) || text.match(/\((\d{1,3}\/\d{2})\)/);
   return { main, jolly, superstar, date: dateMatch ? normalizeText(dateMatch[0]) : null, draw: drawNoMatch ? drawNoMatch[1] : null };
 }
@@ -213,25 +187,29 @@ function parseJackpotFromText(text) {
 }
 
 function parseLatestDrawFromText(text) {
-  const nums = extractAllNumbers(text);
-  if (!nums.length) return null;
+  const jIdx = text.search(/\bJolly\b/i);
+  const sIdx = text.search(/\b(?:Super\s*Star|Superstar|SuperStar)\b/i);
   const jMatch = text.match(/\bJolly\b[^0-9]*(\d{1,2})/i);
   const sMatch = text.match(/\b(?:Super\s*Star|Superstar|SuperStar)\b[^0-9]*(\d{1,2})/i);
   const jolly = jMatch ? parseInt(jMatch[1], 10) : null;
   const superstar = sMatch ? parseInt(sMatch[1], 10) : null;
-  const main = [];
-  const used = new Set([jolly, superstar].filter(v => v != null));
-  for (const n of nums) {
-    if (n >= 1 && n <= 90 && !used.has(n)) {
-      main.push(n);
-      used.add(n);
-      if (main.length === 6) break;
-    }
-  }
-  if (main.length < 6) return null;
+  const cutoff = [jIdx, sIdx].filter(i => i >= 0);
+  const preMainText = cutoff.length ? text.slice(0, Math.min(...cutoff)) : text;
+  const nums = extractAllNumbers(preMainText);
   const dateMatch = text.match(new RegExp(`(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)[^\n]*?\\b\\d{1,2}(?:st|nd|rd|th)?\\b[^\n]*?(January|February|March|April|May|June|July|August|September|October|November|December)[^\n]*?\\b\\d{4}\\b`, "i"))
     || text.match(new RegExp(`\\b\\d{1,2}(?:st|nd|rd|th)?\\s+(?:${monthNames.join("|")})\\s+\\d{4}\\b`, "i"))
     || text.match(new RegExp(`\\b(?:${monthNames.join("|")})\\s+\\d{1,2}(?:st|nd|rd|th)?(?:,)?\\s+\\d{4}\\b`, "i"));
+  const canon = toCanonicalDate(dateMatch ? dateMatch[0] : null) || (dateMatch ? dateMatch[0] : null) || "";
+  const dm = canon.match(/\b\d{1,2}\b/);
+  const dayNum = dm ? parseInt(dm[0], 10) : null;
+  const main = [];
+  const used = new Set([jolly, superstar].filter(v => v != null));
+  for (let i = nums.length - 1; i >= 0 && main.length < 6; i--) {
+    const n = nums[i];
+    if (dayNum != null && n === dayNum) continue;
+    if (!used.has(n) && !main.includes(n)) main.unshift(n);
+  }
+  if (main.length < 6) return null;
   const drawNoMatch = text.match(/Drawing\s*n\.?\s*([0-9]+)/i) || text.match(/\((\d{1,3}\/\d{2})\)/);
   return { main, jolly, superstar, date: dateMatch ? normalizeText(dateMatch[0]) : null, draw: drawNoMatch ? drawNoMatch[1] : null };
 }
