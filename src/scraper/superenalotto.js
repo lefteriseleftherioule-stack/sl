@@ -73,27 +73,31 @@ function equalsDate(a, b) {
 }
 
 function parseLatestDrawFromDom($, root) {
-  const text = normalizeText($(root).text() || "");
-  const jIdx = text.search(/\bJolly\b/i);
-  const sIdx = text.search(/\b(?:Super\s*Star|Superstar|SuperStar)\b/i);
-  const jMatch = text.match(/\bJolly\b[^0-9]*(\d{1,2})/i);
-  const sMatch = text.match(/\b(?:Super\s*Star|Superstar|SuperStar)\b[^0-9]*(\d{1,2})/i);
-  const jolly = jMatch ? parseInt(jMatch[1], 10) : null;
-  const superstar = sMatch ? parseInt(sMatch[1], 10) : null;
-  const cutoff = [jIdx, sIdx].filter(i => i >= 0);
-  const preMainText = cutoff.length ? text.slice(0, Math.min(...cutoff)) : text;
-  const nums = extractAllNumbers(preMainText);
-  const dateMatch = text.match(new RegExp(`(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\\s+\\d{1,2}\\s+(?:${monthNames.join("|")})\\s+\\d{4}`, "i"));
-  const canon = toCanonicalDate(dateMatch ? dateMatch[0] : null) || (dateMatch ? dateMatch[0] : null) || "";
-  const dm = canon.match(/\b\d{1,2}\b/);
-  const dayNum = dm ? parseInt(dm[0], 10) : null;
+  const tokens = [];
+  $(root).find("*").each((_, el) => {
+    const t = normalizeText($(el).text() || "");
+    if (/^\d{1,2}$/.test(t)) tokens.push({ type: "num", value: parseInt(t,10) });
+    else if (/\bJolly\b/i.test(t)) tokens.push({ type: "label", value: "jolly" });
+    else if (/\b(?:Super\s*Star|Superstar|SuperStar)\b/i.test(t)) tokens.push({ type: "label", value: "superstar" });
+  });
+  const firstLabelIdx = tokens.findIndex(t => t.type === "label");
+  const head = firstLabelIdx >= 0 ? tokens.slice(0, firstLabelIdx) : tokens;
   const main = [];
-  const used = new Set([jolly, superstar].filter(v => v != null));
-  for (let i = nums.length - 1; i >= 0 && main.length < 6; i--) {
-    const n = nums[i];
-    if (dayNum != null && n === dayNum) continue;
-    if (!used.has(n) && !main.includes(n)) main.unshift(n);
+  for (let i = head.length - 1; i >= 0 && main.length < 6; i--) {
+    const t = head[i];
+    if (t.type === "num" && !main.includes(t.value)) main.unshift(t.value);
   }
+  const jIdx = tokens.findIndex(t => t.type === "label" && t.value === "jolly");
+  const sIdx = tokens.findIndex(t => t.type === "label" && t.value === "superstar");
+  const pickAfter = (idx) => {
+    if (idx < 0) return null;
+    for (let i = idx + 1; i < tokens.length; i++) { if (tokens[i].type === "num") return tokens[i].value; }
+    return null;
+  };
+  const jolly = pickAfter(jIdx);
+  const superstar = pickAfter(sIdx);
+  const text = normalizeText($(root).text() || "");
+  const dateMatch = text.match(new RegExp(`(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\\s+\\d{1,2}\\s+(?:${monthNames.join("|")})\\s+\\d{4}`, "i"));
   const drawNoMatch = text.match(/Drawing\s*n\.?\s*([0-9]+)/i) || text.match(/\((\d{1,3}\/\d{2})\)/);
   return { main, jolly, superstar, date: dateMatch ? normalizeText(dateMatch[0]) : null, draw: drawNoMatch ? drawNoMatch[1] : null };
 }
@@ -146,15 +150,55 @@ function parseArchiveFromDom($, limit = 20, excludeDate = null) {
       if (!used.has(n)) { main.unshift(n); used.add(n); }
     }
     let jolly = null, superstar = null;
-    const postJText = jIdx >= 0 ? block.slice(jIdx) : '';
-    const postSText = (() => { if (sIdxA >= 0 && sIdxB >= 0) return block.slice(Math.max(sIdxA, sIdxB)); if (sIdxA >= 0) return block.slice(sIdxA); if (sIdxB >= 0) return block.slice(sIdxB); return ''; })();
-    const pickNext = (t) => {
-      const arr = (t.match(/\b\d{1,2}\b/g) || []).map(v => parseInt(v,10)).filter(v => v >= 1 && v <= 90);
-      for (const v of arr) { if (dayNum != null && v === dayNum) continue; if (!used.has(v)) return v; }
-      return null;
+    const findLabelEl = (re) => {
+      let node = null;
+      container.find("*").each((_, n) => {
+        const tt = normalizeText($(n).text() || "");
+        if (!node && re.test(tt)) node = n;
+      });
+      return node;
     };
-    jolly = pickNext(postJText);
-    superstar = pickNext(postSText);
+    const pickNear = (el) => {
+      if (!el) return null;
+      let val = null;
+      $(el).find("span,div,li,b,strong").each((_, nd) => {
+        const t = ($(nd).text() || "").trim();
+        if (/^\d{1,2}$/.test(t)) { val = parseInt(t,10); return false; }
+      });
+      if (val != null) return val;
+      $(el).nextAll().slice(0,5).each((_, sib) => {
+        if (val != null) return false;
+        const tt = ($(sib).text() || "").trim();
+        if (/^\d{1,2}$/.test(tt)) { val = parseInt(tt,10); return false; }
+        $(sib).find("span,div,li,b,strong").each((_, nd) => {
+          const tn = ($(nd).text() || "").trim();
+          if (/^\d{1,2}$/.test(tn)) { val = parseInt(tn,10); return false; }
+        });
+      });
+      return val;
+    };
+    const jEl = findLabelEl(/\bJolly\b/i);
+    const sEl = findLabelEl(/\b(?:Super\s*Star|Superstar|SuperStar)\b/i);
+    jolly = pickNear(jEl);
+    superstar = pickNear(sEl);
+    if (jolly == null) {
+      const postJText = jIdx >= 0 ? block.slice(jIdx) : '';
+      const pickNext = (t) => {
+        const arr = (t.match(/\b\d{1,2}\b/g) || []).map(v => parseInt(v,10)).filter(v => v >= 1 && v <= 90);
+        for (const v of arr) { if (dayNum != null && v === dayNum) continue; if (!used.has(v)) return v; }
+        return null;
+      };
+      jolly = pickNext(postJText);
+    }
+    if (superstar == null) {
+      const postSText = (() => { if (sIdxA >= 0 && sIdxB >= 0) return block.slice(Math.max(sIdxA, sIdxB)); if (sIdxA >= 0) return block.slice(sIdxA); if (sIdxB >= 0) return block.slice(sIdxB); return ''; })();
+      const pickNextS = (t) => {
+        const arr = (t.match(/\b\d{1,2}\b/g) || []).map(v => parseInt(v,10)).filter(v => v >= 1 && v <= 90);
+        for (const v of arr) { if (dayNum != null && v === dayNum) continue; if (!used.has(v)) return v; }
+        return null;
+      };
+      superstar = pickNextS(postSText);
+    }
     if (main.length === 6 && jolly != null && superstar != null) {
       results.push({ date: dateCanon, main, jolly, superstar });
     }
