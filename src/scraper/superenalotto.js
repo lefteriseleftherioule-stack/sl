@@ -299,12 +299,10 @@ function parseArchiveFromDom($, limit = 20, excludeDate = null) {
         });
       }
       if (superstar == null) {
-        for (let i = sIdxTok + 1; i < tokens.length; i++) {
+        for (let i = firstLabelIdx + 1; i < tokens.length; i++) {
           const t = tokens[i];
-          if (t.type === "num") {
-            const v = t.value;
-            if (dayNum != null && v === dayNum) continue;
-            superstar = v;
+          if (t.type === "num" && !main.includes(t.value) && t.value >= 1 && t.value <= 90 && t.el && !isDateContext(t.el)) {
+            superstar = t.value;
             break;
           }
         }
