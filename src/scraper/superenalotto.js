@@ -207,9 +207,11 @@ function parseArchiveFromDom($, limit = 20, excludeDate = null) {
     if (excludeDate && equalsDate(excludeDate, dateCanon)) return;
     const container = $(el).closest("tr, li, article, div").length ? $(el).closest("tr, li, article, div") : $(el);
     const seg = normalizeText(container.text() || "");
+    const drawNoMatch = seg.match(/\b(\d{1,3}\/\d{2})\b/) || seg.match(/Drawing\s*n\.?\s*([0-9]+)/i);
+    const drawNo = drawNoMatch ? drawNoMatch[1] : null;
     const start = seg.indexOf(dateRaw);
     const afterDate = start >= 0 ? seg.slice(start + dateRaw.length) : seg;
-    const nextDateIdx = afterDate.search(/\\b\\d{1,2}(?:st|nd|rd|th)?\\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)(?:\\s+\\d{4})?\\b/i);
+    const nextDateIdx = afterDate.search(/\b\d{1,2}(?:st|nd|rd|th)?\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)(?:\s+\d{4})?\b/i);
     const block = nextDateIdx >= 0 ? afterDate.slice(0, nextDateIdx) : afterDate;
     const jMatches = [...block.matchAll(/\bJolly\b/ig)];
     const sMatchesA = [...block.matchAll(/\bSuper\s*Star\b/ig)];
@@ -281,13 +283,13 @@ function parseArchiveFromDom($, limit = 20, excludeDate = null) {
       superstar = pickNextS(postSText);
     }
     if (main.length === 6 && jolly != null && superstar != null) {
-      results.push({ date: dateCanon, main, jolly, superstar });
+      results.push({ date: dateCanon, draw: drawNo, main, jolly, superstar });
     }
   });
   const unique = [];
   const seen = new Set();
   for (const r of results) {
-    const key = `${r.date}:${r.main.join(',')}:${r.jolly}:${r.superstar}`;
+    const key = `${r.date}:${r.draw || ''}:${r.main.join(',')}:${r.jolly}:${r.superstar}`;
     if (seen.has(key)) continue;
     unique.push(r);
     seen.add(key);
