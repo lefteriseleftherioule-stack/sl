@@ -2,6 +2,10 @@ export default async function handler(req, res) {
   try {
     const { fetchCurrentJackpot, fetchUnifiedResults } = await import("../src/scraper/superenalotto.js");
     const limitParam = req.query?.limit;
+    const debugParam = req.query?.debug;
+    if (debugParam && (debugParam === '1' || /^true$/i.test(String(debugParam)))) {
+      process.env.DEBUG_SUPERSTAR = '1';
+    }
     const limit = Number.isInteger(Number(limitParam)) ? Math.max(1, Math.min(50, Number(limitParam))) : 10;
     let jackpot = null, latest = null, previous = null;
     const errors = {};
