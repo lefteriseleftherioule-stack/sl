@@ -80,15 +80,15 @@ function parseLatestDrawFromDom($, root) {
     else if (/\bJolly\b/i.test(t)) tokens.push({ type: "label", value: "jolly" });
     else if (/\b(?:Super\s*Star|Superstar|SuperStar)\b/i.test(t)) tokens.push({ type: "label", value: "superstar" });
   });
-  const firstLabelIdx = tokens.findIndex(t => t.type === "label");
+  const jIdx = tokens.findIndex(t => t.type === "label" && t.value === "jolly");
+  const sIdx = tokens.findIndex(t => t.type === "label" && t.value === "superstar");
+  const firstLabelIdx = [jIdx, sIdx].filter(i => i >= 0).length ? Math.min(...[jIdx, sIdx].filter(i => i >= 0)) : -1;
   const head = firstLabelIdx >= 0 ? tokens.slice(0, firstLabelIdx) : tokens;
-  const main = [];
+  let main = [];
   for (let i = head.length - 1; i >= 0 && main.length < 6; i--) {
     const t = head[i];
     if (t.type === "num" && !main.includes(t.value)) main.unshift(t.value);
   }
-  const jIdx = tokens.findIndex(t => t.type === "label" && t.value === "jolly");
-  const sIdx = tokens.findIndex(t => t.type === "label" && t.value === "superstar");
   const pickAfter = (idx) => {
     if (idx < 0) return null;
     for (let i = idx + 1; i < tokens.length; i++) { if (tokens[i].type === "num") return tokens[i].value; }
@@ -96,6 +96,16 @@ function parseLatestDrawFromDom($, root) {
   };
   const jolly = pickAfter(jIdx);
   const superstar = pickAfter(sIdx);
+  if (main.length < 6) {
+    const used = new Set([jolly, superstar].filter(v => v != null));
+    main = [];
+    for (const t of tokens) {
+      if (t.type === "num" && !used.has(t.value) && !main.includes(t.value)) {
+        main.push(t.value);
+        if (main.length === 6) break;
+      }
+    }
+  }
   const text = normalizeText($(root).text() || "");
   const dateMatch = text.match(new RegExp(`(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\\s+\\d{1,2}\\s+(?:${monthNames.join("|")})\\s+\\d{4}`, "i"));
   const drawNoMatch = text.match(/Drawing\s*n\.?\s*([0-9]+)/i) || text.match(/\((\d{1,3}\/\d{2})\)/);
@@ -231,29 +241,34 @@ function parseJackpotFromText(text) {
 }
 
 function parseLatestDrawFromText(text) {
-  const jIdx = text.search(/\bJolly\b/i);
-  const sIdx = text.search(/\b(?:Super\s*Star|Superstar|SuperStar)\b/i);
-  const jMatch = text.match(/\bJolly\b[^0-9]*(\d{1,2})/i);
-  const sMatch = text.match(/\b(?:Super\s*Star|Superstar|SuperStar)\b[^0-9]*(\d{1,2})/i);
-  const jolly = jMatch ? parseInt(jMatch[1], 10) : null;
-  const superstar = sMatch ? parseInt(sMatch[1], 10) : null;
-  const cutoff = [jIdx, sIdx].filter(i => i >= 0);
-  const preMainText = cutoff.length ? text.slice(0, Math.min(...cutoff)) : text;
-  const nums = extractAllNumbers(preMainText);
+  const tokens = [];
+  const re = /\b(?:Jolly|Super\s*Star|Superstar|SuperStar)\b|\b\d{1,2}\b/gi;
+  for (const m of text.matchAll(re)) {
+    const s = m[0];
+    if (/^\d{1,2}$/.test(s)) tokens.push({ type: "num", value: parseInt(s,10) });
+    else if (/Jolly/i.test(s)) tokens.push({ type: "label", value: "jolly" });
+    else tokens.push({ type: "label", value: "superstar" });
+  }
+  const jIdx = tokens.findIndex(t => t.type === "label" && t.value === "jolly");
+  const sIdx = tokens.findIndex(t => t.type === "label" && t.value === "superstar");
+  const firstLabelIdx = [jIdx, sIdx].filter(i => i >= 0).length ? Math.min(...[jIdx, sIdx].filter(i => i >= 0)) : -1;
+  const head = firstLabelIdx >= 0 ? tokens.slice(0, firstLabelIdx) : tokens;
+  let main = [];
+  for (let i = head.length - 1; i >= 0 && main.length < 6; i--) {
+    const t = head[i];
+    if (t.type === "num" && !main.includes(t.value)) main.unshift(t.value);
+  }
+  const pickAfter = (idx) => { if (idx < 0) return null; for (let i = idx + 1; i < tokens.length; i++) { if (tokens[i].type === "num") return tokens[i].value; } return null; };
+  const jolly = pickAfter(jIdx);
+  const superstar = pickAfter(sIdx);
+  if (main.length < 6) {
+    const used = new Set([jolly, superstar].filter(v => v != null));
+    main = [];
+    for (const t of tokens) { if (t.type === "num" && !used.has(t.value) && !main.includes(t.value)) { main.push(t.value); if (main.length === 6) break; } }
+  }
   const dateMatch = text.match(new RegExp(`(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)[^\n]*?\\b\\d{1,2}(?:st|nd|rd|th)?\\b[^\n]*?(January|February|March|April|May|June|July|August|September|October|November|December)[^\n]*?\\b\\d{4}\\b`, "i"))
     || text.match(new RegExp(`\\b\\d{1,2}(?:st|nd|rd|th)?\\s+(?:${monthNames.join("|")})\\s+\\d{4}\\b`, "i"))
     || text.match(new RegExp(`\\b(?:${monthNames.join("|")})\\s+\\d{1,2}(?:st|nd|rd|th)?(?:,)?\\s+\\d{4}\\b`, "i"));
-  const canon = toCanonicalDate(dateMatch ? dateMatch[0] : null) || (dateMatch ? dateMatch[0] : null) || "";
-  const dm = canon.match(/\b\d{1,2}\b/);
-  const dayNum = dm ? parseInt(dm[0], 10) : null;
-  const main = [];
-  const used = new Set([jolly, superstar].filter(v => v != null));
-  for (let i = nums.length - 1; i >= 0 && main.length < 6; i--) {
-    const n = nums[i];
-    if (dayNum != null && n === dayNum) continue;
-    if (!used.has(n) && !main.includes(n)) main.unshift(n);
-  }
-  if (main.length < 6) return null;
   const drawNoMatch = text.match(/Drawing\s*n\.?\s*([0-9]+)/i) || text.match(/\((\d{1,3}\/\d{2})\)/);
   return { main, jolly, superstar, date: dateMatch ? normalizeText(dateMatch[0]) : null, draw: drawNoMatch ? drawNoMatch[1] : null };
 }
@@ -311,25 +326,23 @@ export async function fetchCurrentJackpot() {
 }
 
 export async function fetchLatestDraw() {
+  const isComplete = d => d && Array.isArray(d.main) && d.main.length === 6 && d.jolly != null && d.superstar != null && d.date;
   try {
     const $ = await load("https://www.superenalotto.com/en/");
     const el = findSectionElement($, "SuperEnalotto Last Draw");
-    let parsed = el ? parseLatestDrawFromDom($, el) : null;
-    if (!parsed) {
-      const section = findSectionText($, "SuperEnalotto Last Draw");
-      parsed = parseLatestDrawFromText(section);
-    }
-    if (parsed) return { source: "superenalotto.com", ...parsed };
+    let parsed = el ? parseLatestDrawFromDom($, el) : parseLatestDrawFromText(findSectionText($, "SuperEnalotto Last Draw"));
+    if (isComplete(parsed)) return { source: "superenalotto.com", ...parsed };
   } catch {}
   try {
     const $ = await load("https://www.superenalotto.net/en/");
     const el = findSectionElement($, "Latest Result");
-    let parsed = el ? parseLatestDrawFromDom($, el) : null;
-    if (!parsed) {
-      const section = findSectionText($, "Latest Result");
-      parsed = parseLatestDrawFromText(section);
-    }
-    if (parsed) return { source: "superenalotto.net", ...parsed };
+    let parsed = el ? parseLatestDrawFromDom($, el) : parseLatestDrawFromText(findSectionText($, "Latest Result"));
+    if (isComplete(parsed)) return { source: "superenalotto.net", ...parsed };
+  } catch {}
+  try {
+    const prev = await fetchPreviousDraws(1, null);
+    const first = (prev.draws || [])[0];
+    if (first) return { source: prev.source, ...first, draw: null };
   } catch {}
   return { source: null, main: null, jolly: null, superstar: null, date: null, draw: null };
 }
