@@ -236,10 +236,14 @@ function parseArchiveFromDom($, limit = 20, excludeDate = null) {
       };
       const jolly = pickAfter(jIdxTok);
       let superstar = null;
-      const ssNode = container.find('.superstar, .super-star, .super_star').first();
-      if (ssNode.length) {
-        const tt = (ssNode.text() || '').trim();
-        if (/^\d{1,2}$/.test(tt)) superstar = parseInt(tt,10);
+      const starScope = $("article, li, tr, div, section").filter((_, nd) => {
+        const txt = normalizeText($(nd).text() || "");
+        return txt.includes(dateCanon) && $(nd).find(".superstar, .super-star, .super_star").length > 0;
+      }).first();
+      if (starScope.length) {
+        const ssEl = starScope.find(".superstar, .super-star, .super_star").first();
+        const ssTxt = (ssEl.text() || "").trim();
+        if (/^\d{1,2}$/.test(ssTxt)) superstar = parseInt(ssTxt,10);
       }
       const mainSet = new Set(main);
       const mainEls = [];
