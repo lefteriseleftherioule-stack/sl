@@ -284,7 +284,7 @@ function parseArchiveFromDom($, limit = 20, excludeDate = null) {
           }
         });
       }
-      debugLog("superstar-archive-dom", { picked: superstar, containerText: seg.slice(0,200) });
+      debugLog("superstar-archive-dom", { picked: superstar, containerText: (sLabelEl ? normalizeText($(sLabelEl).closest("li, tr, div, section, article").text() || "") : seg).slice(0,200) });
       if (main.length === 6 && jolly != null && superstar != null) {
         results.push({ date: dateCanon, draw: drawNo, main, jolly, superstar });
       }
@@ -401,6 +401,7 @@ function parseArchiveTextToDraws(text, limit = 20) {
         }
       }
       if (jolly != null && superstar != null) {
+        debugLog("superstar-archive-text", { date: normalizeText(date), picked: superstar });
         results.push({ date: normalizeText(date), main, jolly: superstar, superstar: jolly });
       }
     }
