@@ -158,8 +158,26 @@ function parseLatestDrawFromDom($, root) {
       for (let i = idx + 1; i < tokens2.length; i++) { if (tokens2[i].type === "num") return tokens2[i].value; }
       return null;
     };
+    const dayNumFromRoot = (() => {
+      const tt = normalizeText($(root).text() || "");
+      const dmx = tt.match(new RegExp(`\\b\\d{1,2}(?:st|nd|rd|th)?\\s+(?:${monthNames.join("|")})\\s+\\d{4}\\b`, "i"))
+        || tt.match(new RegExp(`\\b(?:${monthNames.join("|")})\\s+\\d{1,2}(?:st|nd|rd|th)?(?:,)?\\s+\\d{4}\\b`, "i"));
+      const d = dmx ? (dmx[0].match(/\\b\\d{1,2}\\b/) || [null])[0] : null;
+      return d ? parseInt(d,10) : null;
+    })();
+    const pickAfter2SkipDay = (idx) => {
+      if (idx < 0) return null;
+      for (let i = idx + 1; i < tokens2.length; i++) {
+        if (tokens2[i].type === "num") {
+          const v = tokens2[i].value;
+          if (dayNumFromRoot != null && v === dayNumFromRoot) continue;
+          return v;
+        }
+      }
+      return null;
+    };
     if (jolly == null) jolly = pickAfter2(jIdx2);
-    if (superstar == null) superstar = pickAfter2(sIdx2);
+    if (superstar == null) superstar = pickAfter2SkipDay(sIdx2);
   }
   if (Array.isArray(main)) {
     main = main.filter(n => n !== jolly && n !== superstar);
@@ -229,8 +247,19 @@ function parseArchiveFromDom($, limit = 20, excludeDate = null) {
         if (t.type === "num" && (dayNum == null || t.value !== dayNum) && !main.includes(t.value)) main.unshift(t.value);
       }
       const pickAfter = (idx) => { if (idx < 0) return null; for (let i = idx + 1; i < tokens.length; i++) { if (tokens[i].type === "num") return tokens[i].value; } return null; };
+      const pickAfterSkipDay = (idx) => {
+        if (idx < 0) return null;
+        for (let i = idx + 1; i < tokens.length; i++) {
+          if (tokens[i].type === "num") {
+            const v = tokens[i].value;
+            if (dayNum != null && v === dayNum) continue;
+            return v;
+          }
+        }
+        return null;
+      };
       const jolly = pickAfter(jIdxTok);
-      const superstar = pickAfter(sIdxTok);
+      const superstar = pickAfterSkipDay(sIdxTok);
       if (main.length === 6 && jolly != null && superstar != null) {
         results.push({ date: dateCanon, draw: drawNo, main, jolly: superstar, superstar: jolly });
       }
@@ -282,8 +311,25 @@ function parseLatestDrawFromText(text) {
     if (t.type === "num" && !main.includes(t.value)) main.unshift(t.value);
   }
   const pickAfter = (idx) => { if (idx < 0) return null; for (let i = idx + 1; i < tokens.length; i++) { if (tokens[i].type === "num") return tokens[i].value; } return null; };
+  const pickAfterSkipDay = (idx) => {
+    if (idx < 0) return null;
+    const dayNumFromText = (() => {
+      const dm = text.match(new RegExp(`\\b\\d{1,2}(?:st|nd|rd|th)?\\s+(?:${monthNames.join("|")})\\s+\\d{4}\\b`, "i"))
+        || text.match(new RegExp(`\\b(?:${monthNames.join("|")})\\s+\\d{1,2}(?:st|nd|rd|th)?(?:,)?\\s+\\d{4}\\b`, "i"));
+      const d = dm ? (dm[0].match(/\\b\\d{1,2}\\b/) || [null])[0] : null;
+      return d ? parseInt(d,10) : null;
+    })();
+    for (let i = idx + 1; i < tokens.length; i++) {
+      if (tokens[i].type === "num") {
+        const v = tokens[i].value;
+        if (dayNumFromText != null && v === dayNumFromText) continue;
+        return v;
+      }
+    }
+    return null;
+  };
   const jolly = pickAfter(jIdx);
-  const superstar = pickAfter(sIdx);
+  const superstar = pickAfterSkipDay(sIdx);
   if (main.length < 6) {
     const used = new Set([jolly, superstar].filter(v => v != null));
     main = [];
