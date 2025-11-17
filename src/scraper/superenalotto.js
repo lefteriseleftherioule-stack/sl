@@ -236,6 +236,11 @@ function parseArchiveFromDom($, limit = 20, excludeDate = null) {
       };
       const jolly = pickAfter(jIdxTok);
       let superstar = null;
+      const ssNode = container.find('.superstar, .super-star, .super_star').first();
+      if (ssNode.length) {
+        const tt = (ssNode.text() || '').trim();
+        if (/^\d{1,2}$/.test(tt)) superstar = parseInt(tt,10);
+      }
       const mainSet = new Set(main);
       const mainEls = [];
       for (let i = 0; i < firstLabelIdx; i++) {
