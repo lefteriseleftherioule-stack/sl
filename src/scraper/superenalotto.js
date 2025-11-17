@@ -397,3 +397,35 @@ export async function fetchPreviousDraws(limit = 10, excludeDate = null) {
   } catch {}
   return { source: null, draws: [] };
 }
+
+export async function fetchUnifiedResults(limit = 10) {
+  try {
+    const $ = await load("https://www.superenalotto.net/en/results");
+    const list = parseArchiveFromDom($, limit + 1, null);
+    if (list.length) {
+      const [latest, ...rest] = list;
+      return {
+        source: "superenalotto.net",
+        latest,
+        previous: { source: "superenalotto.net", draws: rest.slice(0, limit) }
+      };
+    }
+  } catch {}
+  try {
+    const $ = await load("https://www.superenalotto.com/en/archive");
+    let list = parseArchiveFromDom($, limit + 1, null);
+    if (!list.length) {
+      const text = normalizeText($("body").text() || "");
+      list = parseArchiveTextToDraws(text, limit + 1);
+    }
+    if (list.length) {
+      const [latest, ...rest] = list;
+      return {
+        source: "superenalotto.com",
+        latest,
+        previous: { source: "superenalotto.com", draws: rest.slice(0, limit) }
+      };
+    }
+  } catch {}
+  return { source: null, latest: null, previous: { source: null, draws: [] } };
+}
