@@ -1,9 +1,9 @@
 import { load as cheerioLoad } from "cheerio";
 
 const monthNames = ["January","February","March","April","May","June","July","August","September","October","November","December"];
-const DEBUG_SUPERSTAR = !!process.env.DEBUG_SUPERSTAR;
+function debugEnabled() { return !!process.env.DEBUG_SUPERSTAR || !!globalThis.__SUPERSTAR_DEBUG__; }
 function debugLog(type, payload) {
-  if (!DEBUG_SUPERSTAR) return;
+  if (!debugEnabled()) return;
   const entry = { type, ...payload };
   if (!globalThis.__SUPERSTAR_DEBUG__) globalThis.__SUPERSTAR_DEBUG__ = [];
   globalThis.__SUPERSTAR_DEBUG__.push(entry);
