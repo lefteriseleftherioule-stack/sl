@@ -323,7 +323,11 @@ function parseArchiveTextToDraws(text, limit = 20) {
       for (const n of nums) {
         if (main.includes(n)) continue;
         if (jolly == null) { jolly = n; continue; }
-        if (superstar == null) { superstar = n; break; }
+        if (superstar == null) {
+          if (day != null && n === day) continue;
+          superstar = n;
+          break;
+        }
       }
       if (jolly != null && superstar != null) {
         results.push({ date: normalizeText(date), main, jolly: superstar, superstar: jolly });
