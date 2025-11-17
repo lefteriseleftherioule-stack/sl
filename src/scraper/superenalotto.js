@@ -243,6 +243,12 @@ function parseArchiveFromDom($, limit = 20, excludeDate = null) {
       };
       const jolly = pickAfter(jIdxTok);
       let superstar = null;
+      if (sIdxTok >= 0) {
+        const nextTok = tokens[sIdxTok + 1];
+        if (nextTok && nextTok.type === "num" && nextTok.value >= 1 && nextTok.value <= 90 && nextTok.el && !isDateContext(nextTok.el)) {
+          superstar = nextTok.value;
+        }
+      }
       const starScope = $("article, li, tr, div, section").filter((_, nd) => {
         const txt = normalizeText($(nd).text() || "");
         return txt.includes(dateCanon) && $(nd).find(".superstar, .super-star, .super_star").length > 0;
