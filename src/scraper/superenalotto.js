@@ -137,11 +137,45 @@ function parseLatestDrawFromDom($, root) {
     });
     return val;
   };
+  const pickNearLocalStar = (el, dayNum) => {
+    if (!el) return null;
+    const local = $(el).closest("li, tr, div, section, article").length ? $(el).closest("li, tr, div, section, article") : $(el);
+    let val = null;
+    local.find("li, span, div, b, strong").each((_, nd) => {
+      const tt = ($(nd).text() || "").trim();
+      if (/^\d{1,2}$/.test(tt)) {
+        const v = parseInt(tt,10);
+        if (v >= 1 && v <= 90 && v !== dayNum) { val = v; return false; }
+      }
+    });
+    if (val != null) return val;
+    $(el).nextAll().each((_, sib) => {
+      if (val != null) return false;
+      const t = ($(sib).text() || "").trim();
+      if (/^\d{1,2}$/.test(t)) {
+        const v = parseInt(t,10);
+        if (v >= 1 && v <= 90 && v !== dayNum) { val = v; return false; }
+      }
+      $(sib).find("li, span, div, b, strong").each((_, nd) => {
+        const tt = ($(nd).text() || "").trim();
+        if (/^\d{1,2}$/.test(tt)) {
+          const v = parseInt(tt,10);
+          if (v >= 1 && v <= 90 && v !== dayNum) { val = v; return false; }
+        }
+      });
+    });
+    return val;
+  };
   const jEl = findLabelEl(/\bJolly\b/i);
   const sEl = findLabelEl(/\b(?:Super\s*Star|Superstar|SuperStar)\b/i);
+  const rootText = normalizeText($(root).text() || "");
+  const dm = rootText.match(new RegExp(`(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)[^\\n]*?\\b\\d{1,2}(?:st|nd|rd|th)?\\b[^\\n]*?(?:${monthNames.join("|")})[^\\n]*?\\b\\d{4}\\b`, "i"))
+    || rootText.match(new RegExp(`\\b\\d{1,2}(?:st|nd|rd|th)?\\s+(?:${monthNames.join("|")})\\s+\\d{4}\\b`, "i"))
+    || rootText.match(new RegExp(`\\b(?:${monthNames.join("|")})\\s+\\d{1,2}(?:st|nd|rd|th)?(?:,)?\\s+\\d{4}\\b`, "i"));
+  const dayNum = (() => { const m = dm ? dm[0].match(/\b(\d{1,2})(?:st|nd|rd|th)?\b/) : null; return m ? parseInt(m[1],10) : null; })();
   let jolly = pickNear(jEl);
-  let superstar = pickNear(sEl);
-  if (jolly == null || superstar == null) {
+  let superstar = pickNearLocalStar(sEl, dayNum);
+  if (jolly == null) {
     const tokens2 = [];
     $(root).find("*").each((_, el) => {
       const t = normalizeText($(el).text() || "");
@@ -152,14 +186,8 @@ function parseLatestDrawFromDom($, root) {
       else if (/\b(?:Super\s*Star|Superstar|SuperStar)\b/i.test(t)) tokens2.push({ type: "label", value: "superstar" });
     });
     const jIdx2 = tokens2.findIndex(t => t.type === "label" && t.value === "jolly");
-    const sIdx2 = tokens2.findIndex(t => t.type === "label" && t.value === "superstar");
-    const pickAfter2 = (idx) => {
-      if (idx < 0) return null;
-      for (let i = idx + 1; i < tokens2.length; i++) { if (tokens2[i].type === "num") return tokens2[i].value; }
-      return null;
-    };
-    if (jolly == null) jolly = pickAfter2(jIdx2);
-    if (superstar == null) superstar = pickAfter2(sIdx2);
+    const pickAfter2 = (idx) => { if (idx < 0) return null; for (let i = idx + 1; i < tokens2.length; i++) { if (tokens2[i].type === "num") return tokens2[i].value; } return null; };
+    jolly = pickAfter2(jIdx2);
   }
   if (Array.isArray(main)) {
     main = main.filter(n => n !== jolly && n !== superstar);
@@ -219,8 +247,8 @@ function parseArchiveFromDom($, limit = 20, excludeDate = null) {
       if (/^\d{1,2}$/.test(s)) {
         const v = parseInt(s,10);
         if (v >= 1 && v <= 90) tokens.push({ type: "num", value: v, el: nd, isDate: isDateContext(nd) });
-      } else if (/\bJolly\b/i.test(s)) tokens.push({ type: "label", value: "jolly" });
-      else if (/\b(?:Super\s*Star|Superstar|SuperStar)\b/i.test(s)) tokens.push({ type: "label", value: "superstar" });
+      } else if (/\bJolly\b/i.test(s)) tokens.push({ type: "label", value: "jolly", el: nd });
+      else if (/\b(?:Super\s*Star|Superstar|SuperStar)\b/i.test(s)) tokens.push({ type: "label", value: "superstar", el: nd });
     });
     const jIdxTok = tokens.findIndex(t => t.type === "label" && t.value === "jolly");
     const sIdxTok = tokens.findIndex(t => t.type === "label" && t.value === "superstar");
@@ -234,23 +262,18 @@ function parseArchiveFromDom($, limit = 20, excludeDate = null) {
       }
       const pickAfterClean = (idx) => { if (idx < 0) return null; for (let i = idx + 1; i < tokens.length; i++) { const tk = tokens[i]; if (tk.type === "num" && !tk.isDate && !main.includes(tk.value)) return tk.value; } return null; };
       const jolly = pickAfterClean(jIdxTok);
+      const day = (() => { const m = (dateCanon || "").match(/\b(\d{1,2})\b/); return m ? parseInt(m[1],10) : null; })();
+      const sLabelEl = sIdxTok >= 0 && tokens[sIdxTok] ? tokens[sIdxTok].el : null;
       let superstar = null;
-      const ssEl = container.find('.superstar, .super-star, .super_star').first();
-      if (ssEl.length) {
-        const tx = (ssEl.text() || '').trim();
-        if (/^\d{1,2}$/.test(tx)) {
-          const v = parseInt(tx,10);
-          if (v >= 1 && v <= 90 && !isDateContext(ssEl[0])) superstar = v;
-        }
-      }
-      if (superstar == null) {
-        superstar = pickAfterClean(sIdxTok);
-      }
-      if (superstar == null) {
-        for (let i = firstLabelIdx + 1; i < tokens.length; i++) {
-          const t = tokens[i];
-          if (t.type === 'num' && !t.isDate && !main.includes(t.value) && t.value !== jolly) { superstar = t.value; break; }
-        }
+      if (sLabelEl) {
+        const local = $(sLabelEl).closest("li, tr, div, section, article").length ? $(sLabelEl).closest("li, tr, div, section, article") : $(sLabelEl);
+        local.find("*").each((_, nd) => {
+          const tx = (($(nd).text() || '')).trim();
+          if (/^\d{1,2}$/.test(tx)) {
+            const v = parseInt(tx,10);
+            if (v >= 1 && v <= 90 && !isDateContext(nd) && v !== day && !main.includes(v) && v !== jolly) { superstar = v; return false; }
+          }
+        });
       }
       if (main.length === 6 && jolly != null && superstar != null) {
         results.push({ date: dateCanon, draw: drawNo, main, jolly, superstar });
@@ -314,7 +337,8 @@ function parseLatestDrawFromText(text) {
   }
   const pickAfter = (idx) => { if (idx < 0) return null; for (let i = idx + 1; i < tokens.length; i++) { if (tokens[i].type === "num") return tokens[i].value; } return null; };
   const jolly = pickAfter(jIdx);
-  let superstar = pickAfter(sIdx);
+  const pickAfterSkipDate = (idx) => { if (idx < 0) return null; for (let i = idx + 1; i < tokens.length; i++) { const t = tokens[i]; if (t.type === "num" && !t.isDateNumber) return t.value; } return null; };
+  let superstar = pickAfterSkipDate(sIdx);
   if (main.length < 6) {
     const used = new Set([jolly, superstar].filter(v => v != null));
     main = [];
@@ -328,15 +352,7 @@ function parseLatestDrawFromText(text) {
   const dateMatch = text.match(new RegExp(`(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)[^\n]*?\\b\\d{1,2}(?:st|nd|rd|th)?\\b[^\n]*?(January|February|March|April|May|June|July|August|September|October|November|December)[^\n]*?\\b\\d{4}\\b`, "i"))
     || text.match(new RegExp(`\\b\\d{1,2}(?:st|nd|rd|th)?\\s+(?:${monthNames.join("|")})\\s+\\d{4}\\b`, "i"))
     || text.match(new RegExp(`\\b(?:${monthNames.join("|")})\\s+\\d{1,2}(?:st|nd|rd|th)?(?:,)?\\s+\\d{4}\\b`, "i"));
-  const dayNum = (() => { const m = dateMatch ? dateMatch[0].match(/\b(\d{1,2})(?:st|nd|rd|th)?\b/) : null; return m ? parseInt(m[1],10) : null; })();
-  if (superstar != null && dayNum != null && superstar === dayNum) {
-    let nextStar = null;
-    for (let i = sIdx + 1; i < tokens.length; i++) {
-      const tk = tokens[i];
-      if (tk.type === "num" && !tk.isDateNumber && tk.value !== dayNum) { nextStar = tk.value; break; }
-    }
-    superstar = nextStar;
-  }
+
   const drawNoMatch = text.match(/Drawing\s*n\.?\s*([0-9]+)/i) || text.match(/\((\d{1,3}\/\d{2})\)/);
   return { main, jolly: superstar, superstar: jolly, date: dateMatch ? normalizeText(dateMatch[0]) : null, draw: drawNoMatch ? drawNoMatch[1] : null };
 }
