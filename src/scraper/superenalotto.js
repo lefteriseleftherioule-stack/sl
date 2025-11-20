@@ -506,3 +506,43 @@ export async function fetchUnifiedResults(limit = 10) {
   } catch {}
   return { source: null, latest: null, previous: { source: null, draws: [] } };
 }
+
+export async function fetchLatestPrizeBreakdown() {
+  const parseTable = ($) => {
+    const rows = [];
+    $("table").each((_, tbl) => {
+      const headers = [];
+      $(tbl).find("tr").first().find("th,td").each((_, cell) => {
+        headers.push(normalizeText($(cell).text() || ""));
+      });
+      const lower = headers.map(h => h.toLowerCase());
+      const hasTier = lower.some(h => /tier|category/.test(h));
+      const hasWinners = lower.some(h => /winner/.test(h));
+      const hasDistributed = lower.some(h => /distributed|prize/.test(h));
+      if (!(hasTier && hasWinners && hasDistributed)) return;
+      const tierIdx = lower.findIndex(h => /tier|category/.test(h));
+      const winnersIdx = lower.findIndex(h => /winner/.test(h));
+      const prizeIdx = lower.findIndex(h => /distributed|prize/.test(h));
+      $(tbl).find("tr").slice(1).each((_, tr) => {
+        const cells = $(tr).find("td,th");
+        if (!cells.length) return;
+        const tier = normalizeText($(cells[tierIdx] || cells[0]).text() || "");
+        const winners = normalizeText($(cells[winnersIdx] || cells[1]).text() || "");
+        const amount = normalizeText($(cells[prizeIdx] || cells[cells.length - 1]).text() || "");
+        if (tier && (winners || amount)) rows.push({ tier, winners, amount });
+      });
+    });
+    return rows;
+  };
+  try {
+    const $ = await load("https://www.superenalotto.net/en/results");
+    const rows = parseTable($);
+    if (rows.length) return { source: "superenalotto.net", rows };
+  } catch {}
+  try {
+    const $ = await load("https://www.superenalotto.com/en/");
+    const rows = parseTable($);
+    if (rows.length) return { source: "superenalotto.com", rows };
+  } catch {}
+  return { source: null, rows: [] };
+}
