@@ -516,13 +516,13 @@ export async function fetchLatestPrizeBreakdown() {
         headers.push(normalizeText($(cell).text() || ""));
       });
       const lower = headers.map(h => h.toLowerCase());
-      const hasTier = lower.some(h => /tier|category/.test(h));
+      const hasTier = lower.some(h => /tier|category|match/.test(h));
       const hasWinners = lower.some(h => /winner/.test(h));
-      const hasDistributed = lower.some(h => /distributed|prize/.test(h));
+      const hasDistributed = lower.some(h => /distributed|prize|amount/.test(h));
       if (!(hasTier && hasWinners && hasDistributed)) return;
-      const tierIdx = lower.findIndex(h => /tier|category/.test(h));
+      const tierIdx = lower.findIndex(h => /tier|category|match/.test(h));
       const winnersIdx = lower.findIndex(h => /winner/.test(h));
-      const prizeIdx = lower.findIndex(h => /distributed|prize/.test(h));
+      const prizeIdx = lower.findIndex(h => /distributed|prize|amount/.test(h));
       $(tbl).find("tr").slice(1).each((_, tr) => {
         const cells = $(tr).find("td,th");
         if (!cells.length) return;
@@ -534,9 +534,45 @@ export async function fetchLatestPrizeBreakdown() {
     });
     return rows;
   };
+  const getFirstDrawDetailsLink = ($) => {
+    let href = null;
+    $("a").each((_, a) => {
+      const t = normalizeText($(a).text() || "").toLowerCase();
+      if (!href && /draw\s*details/.test(t)) href = $(a).attr("href") || null;
+    });
+    return href;
+  };
+  const parseFromDrawDetails = async (url) => {
+    try {
+      const $det = await load(url);
+      const rows = parseTable($det);
+      if (rows.length) return rows;
+      const text = normalizeText($det("body").text() || "");
+      const tiers = ["6","5+Jolly","5","4","3","2"]; 
+      const out = [];
+      tiers.forEach(t => {
+        const re = new RegExp(`${t.replace(/\+/g, "\\+")}[\s\S]*?(winners?[^0-9]*([0-9][0-9.,]*))?[\s\S]*?((?:€|EUR)\s*[0-9][0-9.,]*)`, "i");
+        const m = text.match(re);
+        if (m) {
+          const winners = m[2] ? m[2] : "";
+          const amount = m[3] ? m[3] : "";
+          out.push({ tier: t, winners, amount });
+        }
+      });
+      return out;
+    } catch { return []; }
+  };
   try {
     const $ = await load("https://www.superenalotto.net/en/results");
-    const rows = parseTable($);
+    let rows = parseTable($);
+    if (!rows.length) {
+      const href = getFirstDrawDetailsLink($);
+      if (href) {
+        const full = /^https?:/i.test(href) ? href : `https://www.superenalotto.net${href}`;
+        const detRows = await parseFromDrawDetails(full);
+        if (detRows.length) rows = detRows;
+      }
+    }
     if (rows.length) return { source: "superenalotto.net", rows };
   } catch {}
   try {
